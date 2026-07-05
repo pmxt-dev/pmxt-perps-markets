@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { MARKETS, CATEGORIES } from '@/lib/data'
-import { Market, Category } from '@/lib/types'
+import { Category } from '@/lib/types'
 
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All')
