@@ -29,7 +29,7 @@ export default function MarketDetail() {
   return (
     <div className="min-h-screen bg-dark-bg">
       <header className="border-b border-dark-border">
-        <div className="max-w-7xl mx-auto px-8 py-5 flex items-center justify-between">
+        <div className="mx-auto px-8 py-5 flex items-center justify-between" style={{ maxWidth: '80rem' }}>
           <div className="flex items-center gap-10">
             <span className="text-lg font-semibold">PMXT</span>
             <nav className="flex items-center gap-8 text-sm text-gray-400">
@@ -43,7 +43,7 @@ export default function MarketDetail() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-8 py-10">
+      <main className="mx-auto px-8 py-10" style={{ maxWidth: '80rem', width: '100%' }}>
         <Link href="/" className="text-accent-primary hover:text-accent-primary/80 transition text-sm mb-10 inline-block">
           Back to Markets
         </Link>

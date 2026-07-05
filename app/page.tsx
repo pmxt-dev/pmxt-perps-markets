@@ -15,7 +15,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-dark-bg">
       <header className="border-b border-dark-border">
-        <div className="max-w-7xl mx-auto px-8 py-5 flex items-center justify-between">
+        <div className="mx-auto px-8 py-5 flex items-center justify-between" style={{ maxWidth: '80rem' }}>
           <div className="flex items-center gap-10">
             <span className="text-lg font-semibold">PMXT</span>
             <nav className="flex items-center gap-8 text-sm text-gray-400">
@@ -30,7 +30,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-8 py-10">
+      <main className="mx-auto px-8 py-10" style={{ maxWidth: '80rem', width: '100%' }}>
         <div className="grid grid-cols-3 gap-10">
           <div className="col-span-2 space-y-8">
             <div>
@@ -172,7 +172,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-dark-border mt-16">
-        <div className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between text-xs text-gray-500">
+        <div className="mx-auto px-8 py-6 flex items-center justify-between text-xs text-gray-500" style={{ maxWidth: '80rem' }}>
           <div className="flex items-center gap-6">
             <span>v0.01 • Built on PMXT</span>
             <a href="#" className="hover:text-gray-400 transition">Docs</a>
