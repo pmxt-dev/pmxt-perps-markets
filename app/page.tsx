@@ -187,6 +187,8 @@ interface YfAsset {
 
 function CreateMarket() {
   const [priceSource, setPriceSource] = useState('yfinance')
+  const [category, setCategory] = useState('crypto')
+  const [customCategory, setCustomCategory] = useState('')
   const [feeBpsStr, setFeeBpsStr] = useState('100')
   const [creatorFeeStr, setCreatorFeeStr] = useState('20')
   const [query, setQuery] = useState('')
@@ -245,15 +247,29 @@ function CreateMarket() {
 
         <Field label="category">
           <div className="flex flex-wrap gap-1.5">
-            {['crypto', 'pre-ipo', 'ai', 'index'].map(cat => (
+            {['crypto', 'pre-ipo', 'ai', 'index', 'other'].map(cat => (
               <button
                 key={cat}
-                className="text-[11px] px-2.5 py-1 rounded-md border border-border text-muted hover:text-text hover:border-muted transition"
+                onClick={() => setCategory(cat)}
+                className={`text-[11px] px-2.5 py-1 rounded-md border transition ${
+                  category === cat
+                    ? 'bg-accent/10 border-accent text-accent'
+                    : 'border-border text-muted hover:text-text hover:border-muted'
+                }`}
               >
                 {cat}
               </button>
             ))}
           </div>
+          {category === 'other' && (
+            <input
+              type="text"
+              value={customCategory}
+              onChange={(e) => setCustomCategory(e.target.value)}
+              placeholder="your category — community, sports, elections…"
+              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
+            />
+          )}
         </Field>
 
         <Field
