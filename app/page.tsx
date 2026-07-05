@@ -92,6 +92,8 @@ export default function Home() {
 }
 
 function CreateMarket() {
+  const [priceSource, setPriceSource] = useState('pmxt')
+  const [creatorFee, setCreatorFee] = useState(20)
   return (
     <aside className="border border-border rounded-xl bg-panel overflow-hidden font-mono sticky top-20">
       <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
@@ -119,28 +121,58 @@ function CreateMarket() {
           </div>
         </Field>
 
-        <Field label="price source">
-          <select className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text outline-none focus:border-muted transition">
-            <option>pmxt source</option>
-            <option>custom api</option>
-            <option>websocket</option>
+        <Field
+          label="price source"
+          hint={priceSource === 'orderbook' ? 'no external oracle — the market’s own orderbook is the price. for pre-ipo and anything without a feed. trade at your own risk.' : undefined}
+        >
+          <select
+            value={priceSource}
+            onChange={(e) => setPriceSource(e.target.value)}
+            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text outline-none focus:border-muted transition"
+          >
+            <option value="pmxt">pmxt source</option>
+            <option value="yfinance">yfinance</option>
+            <option value="orderbook">orderbook (self-oracle)</option>
+            <option value="custom-api" disabled>custom api — coming soon</option>
+            <option value="websocket" disabled>websocket — coming soon</option>
           </select>
         </Field>
 
-        <Field label="seed liquidity (usdc)" hint="minimum 1,000 usdc">
+        <Field label="seed liquidity (usdc)" hint="minimum 100 usdc">
           <input
             type="number"
-            placeholder="10,000"
+            min={100}
+            placeholder="100"
             className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
           />
         </Field>
 
-        <Field label="creator fee (%)" hint="you earn this share of all trading fees">
-          <input
-            type="number"
-            placeholder="20"
-            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
-          />
+        <Field label="fees">
+          <div className="rounded-md border border-border bg-bg px-3 py-2.5 flex flex-col gap-1.5 text-[11px]">
+            <div className="flex justify-between">
+              <span className="text-muted">protocol fee</span>
+              <span className="text-text">30% of trading fees · fixed</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted">creator fee</span>
+              <div className="relative shrink-0">
+                <input
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={creatorFee}
+                  onChange={(e) => setCreatorFee(Math.max(0, Math.min(50, parseInt(e.target.value) || 0)))}
+                  className="w-16 bg-panel border border-border rounded-md pl-2 pr-6 py-1 text-right text-text outline-none focus:border-muted transition"
+                />
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted">%</span>
+              </div>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">liquidity providers</span>
+              <span className="text-text">{70 - creatorFee}%</span>
+            </div>
+          </div>
+          <span className="text-[10px] text-muted">creator fee is your share of trading fees, max 50%</span>
         </Field>
 
         <button className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none">
