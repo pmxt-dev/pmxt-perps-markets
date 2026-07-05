@@ -15,58 +15,62 @@ export default function BuySell({ symbol, price }: BuySellProps) {
   const notional = parseFloat(size) * price || 0
   const margin = notional / leverage || 0
 
-  return (
-    <div className="border border-gray-700 rounded-lg p-6 bg-black/50">
-      <h3 className="text-lg font-semibold mb-6">{side === 'buy' ? 'Buy' : 'Sell'} {symbol}</h3>
+  const isBuy = side === 'buy'
+  const theme = isBuy
+    ? { bg: 'bg-accent-primary', text: 'text-accent-primary' }
+    : { bg: 'bg-accent-red', text: 'text-accent-red' }
 
-      <div className="flex gap-2 mb-8 bg-dark-surface rounded-lg p-1">
+  return (
+    <div className="font-mono flex flex-col gap-3">
+      <div className="flex items-end border-b border-gray-700">
         <button
           onClick={() => setSide('buy')}
-          className={`flex-1 py-2 rounded font-medium transition ${
-            side === 'buy'
-              ? 'bg-accent-primary text-dark-bg'
-              : 'text-gray-400 hover:text-gray-300'
+          className={`px-3 pb-2 -mb-px border-b-2 text-sm font-semibold transition tracking-wider ${
+            isBuy ? 'border-accent-primary text-white' : 'border-transparent text-gray-500 hover:text-gray-400'
           }`}
         >
-          Buy
+          BUY
         </button>
         <button
           onClick={() => setSide('sell')}
-          className={`flex-1 py-2 rounded font-medium transition ${
-            side === 'sell'
-              ? 'bg-accent-red text-white'
-              : 'text-gray-400 hover:text-gray-300'
+          className={`px-3 pb-2 -mb-px border-b-2 text-sm font-semibold transition tracking-wider ${
+            !isBuy ? 'border-accent-red text-white' : 'border-transparent text-gray-500 hover:text-gray-400'
           }`}
         >
-          Sell
+          SELL
         </button>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase mb-3">Entry Price</label>
+          <div className="text-sm text-gray-400 mb-2">ENTRY PRICE</div>
           <div className="text-3xl font-bold">
             ${price.toLocaleString('en-US', { maximumFractionDigits: 1 })}
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Size (Contracts)</label>
-          <input
-            type="number"
-            value={size}
-            onChange={(e) => setSize(e.target.value)}
-            placeholder="0"
-            className="w-full bg-dark-bg border border-gray-700 rounded px-3 py-3 text-base text-white placeholder-gray-600 focus:border-accent-primary outline-none transition"
-          />
-          <div className="text-xs text-gray-500 mt-2">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-sm text-gray-300">size (contracts)</span>
+            <div className="relative shrink-0">
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-base font-semibold text-white">$</span>
+              <input
+                type="number"
+                value={size}
+                onChange={(e) => setSize(e.target.value.replace(/[^0-9.]/g, ''))}
+                placeholder="0.00"
+                className="w-40 bg-black border border-gray-700 rounded-md pl-7 pr-3 py-2 text-right text-base font-semibold text-white outline-none focus:border-accent-primary transition"
+              />
+            </div>
+          </div>
+          <div className="text-xs text-gray-500 text-right">
             Notional: ${notional.toLocaleString('en-US', { maximumFractionDigits: 2 })}
           </div>
         </div>
 
-        <div>
+        <div className="border-t border-gray-700 pt-4">
           <div className="flex items-center justify-between mb-3">
-            <label className="text-sm font-medium text-gray-300">Leverage</label>
+            <label className="text-sm text-gray-300">leverage</label>
             <span className="text-sm text-accent-primary font-semibold">{leverage}x</span>
           </div>
           <input
@@ -77,25 +81,23 @@ export default function BuySell({ symbol, price }: BuySellProps) {
             onChange={(e) => setLeverage(parseInt(e.target.value))}
             className="w-full cursor-pointer accent-accent-primary"
           />
-          <div className="text-xs text-gray-500 mt-2">Max Leverage: 20x</div>
+          <div className="text-xs text-gray-500 mt-2 text-right">Max Leverage: 20x</div>
         </div>
 
-        <div className="pt-4 border-t border-gray-700">
-          <label className="block text-xs font-semibold text-gray-500 uppercase mb-3">Margin Required</label>
+        <div className="rounded-md border border-gray-700 bg-black/30 px-3 py-3">
+          <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">MARGIN REQUIRED</div>
           <div className="text-2xl font-bold">
             ${margin.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDC
           </div>
         </div>
 
         <button
-          className={`w-full py-3 rounded font-semibold transition text-base ${
-            side === 'buy'
-              ? 'bg-accent-primary hover:opacity-90 text-dark-bg'
-              : 'bg-accent-red hover:opacity-90 text-white'
-          } ${(!size || margin <= 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`w-full rounded-xl px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none ${
+            !size || margin <= 0 ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'
+          } ${theme.bg}`}
           disabled={!size || margin <= 0}
         >
-          {side === 'buy' ? 'Open Long' : 'Open Short'}
+          {isBuy ? 'OPEN LONG' : 'OPEN SHORT'}
         </button>
 
         <p className="text-xs text-gray-500 text-center">Connect wallet to trade</p>
