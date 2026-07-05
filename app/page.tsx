@@ -154,9 +154,15 @@ export default function Home() {
                   href={`/markets/${market.id}`}
                   className="flex items-center gap-4 px-4 py-3 text-xs hover:bg-white/[0.03] transition"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-text text-sm">{market.symbol}</div>
-                    <div className="text-[10px] text-muted truncate mt-0.5">{market.asset.toLowerCase()}</div>
+                  <div className="min-w-0 flex-1 flex items-center gap-2.5">
+                    {market.thumbnail && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={market.thumbnail} alt="" className="w-6 h-6 rounded-md object-cover shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-text text-sm">{market.symbol}</div>
+                      <div className="text-[10px] text-muted truncate mt-0.5">{market.asset.toLowerCase()}</div>
+                    </div>
                   </div>
                   <div className="w-24 shrink-0 hidden sm:block opacity-70">
                     {sparkData && <Sparkline data={sparkData} isPositive={up} />}
@@ -206,6 +212,7 @@ function CreateMarket() {
   const [priceSource, setPriceSource] = useState('yfinance')
   const [category, setCategory] = useState('crypto')
   const [customCategory, setCustomCategory] = useState('')
+  const [thumbnailUrl, setThumbnailUrl] = useState('')
   const [feeBpsStr, setFeeBpsStr] = useState('100')
   const [creatorFeeStr, setCreatorFeeStr] = useState('20')
   const [query, setQuery] = useState('')
@@ -259,6 +266,16 @@ function CreateMarket() {
             rows={3}
             placeholder="what does this market track, and where does its price come from?"
             className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition resize-none"
+          />
+        </Field>
+
+        <Field label="thumbnail (image url)">
+          <input
+            type="text"
+            value={thumbnailUrl}
+            onChange={(e) => setThumbnailUrl(e.target.value)}
+            placeholder="https://… square image shown next to the name"
+            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
           />
         </Field>
 

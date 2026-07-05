@@ -60,6 +60,13 @@ export default function MarketDetail() {
   const [chainError, setChainError] = useState<string | null>(null)
   const [book, setBook] = useState<BookData | null>(null)
   const [bookError, setBookError] = useState<string | null>(null)
+  const [refreshTick, setRefreshTick] = useState(0)
+  // a fill from the ticket refreshes book/price immediately instead of waiting for the poll
+  useEffect(() => {
+    const bump = () => setRefreshTick(t => t + 1)
+    window.addEventListener('pmxt:trade', bump)
+    return () => window.removeEventListener('pmxt:trade', bump)
+  }, [])
   useEffect(() => {
     if (!chainSymbol) return
     let cancelled = false
@@ -111,7 +118,7 @@ export default function MarketDetail() {
     loadBook()
     const iv = setInterval(() => { load(); loadHistory(); loadBook() }, 15_000)
     return () => { cancelled = true; clearInterval(iv) }
-  }, [chainSymbol])
+  }, [chainSymbol, refreshTick])
 
   if (!market) {
     return (
@@ -184,9 +191,15 @@ export default function MarketDetail() {
             </div>
 
             <div className="px-4 pt-4 pb-2 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm font-medium leading-snug">&gt; {market.symbol}</div>
-                <div className="text-xs text-muted mt-1">{market.asset.toLowerCase()} · {market.category.toLowerCase()}</div>
+              <div className="min-w-0 flex items-center gap-2.5">
+                {market.thumbnail && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={market.thumbnail} alt="" className="w-8 h-8 rounded-md object-cover shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <div className="text-sm font-medium leading-snug">&gt; {market.symbol}</div>
+                  <div className="text-xs text-muted mt-1">{market.asset.toLowerCase()} · {market.category.toLowerCase()}</div>
+                </div>
               </div>
               <div className="text-right shrink-0">
                 <div className={`text-2xl font-semibold leading-none ${up ? 'text-yes' : 'text-no'}`}>
