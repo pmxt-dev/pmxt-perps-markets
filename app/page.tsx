@@ -67,7 +67,7 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredMarkets.map((market, idx) => (
+                    {filteredMarkets.map((market) => (
                       <Link
                         key={market.id}
                         href={`/markets/${market.id}`}

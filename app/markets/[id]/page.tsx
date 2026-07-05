@@ -1,12 +1,15 @@
 'use client'
 
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MARKETS } from '@/lib/data'
 import Sparkline from '@/components/Sparkline'
 import BuySell from '@/components/BuySell'
 
-export default function MarketDetail({ params }: { params: { id: string } }) {
-  const market = MARKETS.find(m => m.id === params.id)
+export default function MarketDetail() {
+  const params = useParams()
+  const id = params?.id as string
+  const market = MARKETS.find(m => m.id === id)
 
   if (!market) {
     return (
