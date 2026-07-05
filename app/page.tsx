@@ -3,11 +3,43 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { MARKETS, CATEGORIES } from '@/lib/data'
+import { fmtPrice } from '@/lib/format'
 import { Category } from '@/lib/types'
 import Sparkline from '@/components/Sparkline'
 
+interface LiveQuote {
+  price: number
+  change: number | null
+  closes?: number[]
+}
+
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All')
+  const [live, setLive] = useState<Record<string, LiveQuote>>({})
+
+  // list must show the same live price the detail page shows — mock values only remain
+  // for orderbook (self-oracle) markets and as a fallback while quotes load
+  useEffect(() => {
+    let cancelled = false
+    MARKETS.forEach(m => {
+      if (m.sourceType !== 'yfinance' || !m.sourceTicker) return
+      fetch(`/api/yf-price?symbol=${encodeURIComponent(m.sourceTicker)}`)
+        .then(r => r.json())
+        .then(d => {
+          if (cancelled || typeof d.price !== 'number') return
+          setLive(prev => ({
+            ...prev,
+            [m.id]: {
+              price: d.price,
+              change: typeof d.change === 'number' ? d.change : null,
+              closes: Array.isArray(d.closes) && d.closes.length >= 2 ? d.closes : undefined,
+            },
+          }))
+        })
+        .catch(() => {})
+    })
+    return () => { cancelled = true }
+  }, [])
 
   const filteredMarkets = selectedCategory === 'All'
     ? MARKETS
@@ -43,7 +75,11 @@ export default function Home() {
           </div>
           <div className="divide-y divide-border/50">
             {filteredMarkets.map((market) => {
-              const up = market.change24h >= 0
+              const quote = live[market.id]
+              const price = quote?.price ?? market.price
+              const change = quote?.change ?? market.change24h
+              const sparkData = quote?.closes ?? market.sparkline
+              const up = change >= 0
               return (
                 <Link
                   key={market.id}
@@ -55,12 +91,12 @@ export default function Home() {
                     <div className="text-[10px] text-muted truncate mt-0.5">{market.asset.toLowerCase()}</div>
                   </div>
                   <div className="w-24 shrink-0 hidden sm:block opacity-70">
-                    {market.sparkline && <Sparkline data={market.sparkline} isPositive={up} />}
+                    {sparkData && <Sparkline data={sparkData} isPositive={up} />}
                   </div>
                   <div className="text-right shrink-0 w-24">
-                    <div className="text-text">${market.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+                    <div className="text-text">${fmtPrice(price)}</div>
                     <div className={`text-[10px] mt-0.5 ${up ? 'text-yes' : 'text-no'}`}>
-                      {up ? '▲' : '▼'} {up ? '+' : ''}{market.change24h.toFixed(2)}%
+                      {up ? '▲' : '▼'} {up ? '+' : ''}{change.toFixed(2)}%
                     </div>
                   </div>
                   <div className="text-right shrink-0 w-20 hidden sm:block">

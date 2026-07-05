@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MARKETS } from '@/lib/data'
+import { fmtPrice } from '@/lib/format'
 import Sparkline from '@/components/Sparkline'
 import BuySell from '@/components/BuySell'
 import OrderBook from '@/components/OrderBook'
@@ -86,7 +87,7 @@ export default function MarketDetail() {
               </div>
               <div className="text-right shrink-0">
                 <div className={`text-2xl font-semibold leading-none ${up ? 'text-yes' : 'text-no'}`}>
-                  ${markPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                  ${fmtPrice(markPrice)}
                 </div>
                 <div className={`text-[10px] uppercase tracking-wide mt-1 ${up ? 'text-yes' : 'text-no'}`}>
                   {up ? '▲' : '▼'} {up ? '+' : ''}{changePct.toFixed(2)}% {changeLabel}
@@ -112,12 +113,16 @@ export default function MarketDetail() {
 
             <div className="relative">
               {chartData && <Sparkline data={chartData} isPositive={up} oracleSeries={oracleSeries} />}
-              <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-[#ff9f43]/40 rounded-md px-1.5 py-0.5 pointer-events-none">
-                <span className="text-[#ff9f43]">— oracle ${oraclePrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
-                <span className="text-muted ml-1.5">
-                  {market.sourceType === 'yfinance' ? `yfinance · ${market.sourceTicker}` : 'self (orderbook)'}
-                </span>
-              </div>
+              {isYf ? (
+                <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-[#ff9f43]/40 rounded-md px-1.5 py-0.5 pointer-events-none">
+                  <span className="text-[#ff9f43]">— oracle ${fmtPrice(oraclePrice)}</span>
+                  <span className="text-muted ml-1.5">yfinance · {market.sourceTicker}</span>
+                </div>
+              ) : (
+                <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none text-muted">
+                  self-oracled — the orderbook is the price feed
+                </div>
+              )}
             </div>
 
             <div className="p-3 border-t border-border flex justify-between text-[10px] text-muted">

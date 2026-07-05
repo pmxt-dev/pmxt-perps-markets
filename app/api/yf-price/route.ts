@@ -11,8 +11,17 @@ export async function GET(req: NextRequest) {
     )
     if (!res.ok) return NextResponse.json({ price: null }, { status: 502 })
     const data = await res.json()
-    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice ?? null
-    return NextResponse.json({ price })
+    const result = data?.chart?.result?.[0]
+    const price = result?.meta?.regularMarketPrice ?? null
+    const prevClose = result?.meta?.chartPreviousClose ?? null
+    const change =
+      typeof price === 'number' && typeof prevClose === 'number' && prevClose !== 0
+        ? ((price - prevClose) / prevClose) * 100
+        : null
+    const closes = (result?.indicators?.quote?.[0]?.close ?? []).filter(
+      (c: unknown): c is number => typeof c === 'number',
+    )
+    return NextResponse.json({ price, change, closes })
   } catch {
     return NextResponse.json({ price: null }, { status: 502 })
   }

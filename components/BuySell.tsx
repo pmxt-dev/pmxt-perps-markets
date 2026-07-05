@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import { LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { fmtPrice } from '@/lib/format'
 
 interface BuySellProps {
   symbol: string
@@ -71,7 +72,7 @@ export default function BuySell({ symbol, price }: BuySellProps) {
       </div>
 
       <div className="flex justify-between text-[11px] text-muted">
-        <span>entry <span className="text-text">${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span></span>
+        <span>entry <span className="text-text">${fmtPrice(price)}</span></span>
       </div>
 
       {connected && (
