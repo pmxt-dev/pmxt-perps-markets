@@ -31,7 +31,7 @@ export default function Home() {
       </header>
 
       <main className="max-w-7xl mx-auto px-8 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="grid grid-cols-3 gap-10">
           <div className="lg:col-span-2 space-y-8">
             <div>
               <h1 className="text-3xl font-semibold mb-3">Markets</h1>
@@ -72,7 +72,7 @@ export default function Home() {
                       href={`/markets/${market.id}`}
                       className="block hover:bg-dark-surface/50 transition cursor-pointer border-b border-dark-border last:border-b-0"
                     >
-                      <div className="px-6 py-4 grid grid-cols-5 gap-4 items-center">
+                      <div className="px-6 py-4 grid gap-4" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 0.8fr' }}>
                         <div className="min-w-0">
                           <div className="font-medium text-white truncate">{market.symbol}</div>
                           <div className="text-xs text-gray-500 truncate">{market.asset}</div>
