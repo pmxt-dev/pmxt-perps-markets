@@ -92,7 +92,7 @@ export default function Home() {
 }
 
 function CreateMarket() {
-  const [priceSource, setPriceSource] = useState('pmxt')
+  const [priceSource, setPriceSource] = useState('yfinance')
   const [creatorFee, setCreatorFee] = useState(20)
   return (
     <aside className="border border-border rounded-xl bg-panel overflow-hidden font-mono sticky top-20">
@@ -130,11 +130,9 @@ function CreateMarket() {
             onChange={(e) => setPriceSource(e.target.value)}
             className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text outline-none focus:border-muted transition"
           >
-            <option value="pmxt">pmxt source</option>
             <option value="yfinance">yfinance</option>
             <option value="orderbook">orderbook (self-oracle)</option>
             <option value="custom-api" disabled>custom api — coming soon</option>
-            <option value="websocket" disabled>websocket — coming soon</option>
           </select>
         </Field>
 
