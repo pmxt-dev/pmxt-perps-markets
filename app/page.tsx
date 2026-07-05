@@ -16,6 +16,7 @@ interface LiveQuote {
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All')
   const [live, setLive] = useState<Record<string, LiveQuote>>({})
+  const [chainError, setChainError] = useState<string | null>(null)
 
   // list must show the same live price the detail page shows — mock values only remain
   // for orderbook (self-oracle) markets and as a fallback while quotes load
@@ -38,6 +39,51 @@ export default function Home() {
         })
         .catch(() => {})
     })
+    // onchain markets read their oracle from the deployed Hayek chain
+    fetch('/api/chain-markets')
+      .then(async r => {
+        const d = await r.json()
+        if (cancelled) return
+        if (!r.ok || !Array.isArray(d.markets)) {
+          setChainError(typeof d.error === 'string' ? d.error : 'chain feed unreachable')
+          return
+        }
+        setChainError(null)
+        const bySymbol = new Map<string, number>(
+          d.markets.map((cm: { name: string; oraclePrice: number }) => [cm.name, cm.oraclePrice]),
+        )
+        setLive(prev => {
+          const next = { ...prev }
+          MARKETS.forEach(m => {
+            if (m.sourceType !== 'onchain' || !m.chainSymbol) return
+            const price = bySymbol.get(m.chainSymbol)
+            if (typeof price === 'number') next[m.id] = { price, change: null }
+          })
+          return next
+        })
+        // sparklines from the recorded oracle series
+        MARKETS.forEach(m => {
+          if (m.sourceType !== 'onchain' || !m.chainSymbol) return
+          fetch(`/api/chain-history?symbol=${encodeURIComponent(m.chainSymbol)}`)
+            .then(async r => {
+              const h = await r.json()
+              if (cancelled || !r.ok || !Array.isArray(h.points)) return
+              const closes = h.points
+                .map((pt: { p: number }) => pt.p)
+                .filter((p: unknown): p is number => typeof p === 'number')
+              if (closes.length < 2) return
+              const change = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100
+              setLive(prev => ({
+                ...prev,
+                [m.id]: { price: closes[closes.length - 1], change, closes },
+              }))
+            })
+            .catch(() => {})
+        })
+      })
+      .catch(e => {
+        if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
+      })
     return () => { cancelled = true }
   }, [])
 
@@ -72,6 +118,11 @@ export default function Home() {
         <div className="border border-border rounded-xl bg-panel overflow-hidden font-mono">
           <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
             // {selectedCategory === 'All' ? 'all markets' : selectedCategory.toLowerCase()} ({filteredMarkets.length})
+            {chainError && (
+              <span className="ml-3 normal-case tracking-normal text-no">
+                ✗ chain feed: {chainError} — onchain prices may be stale
+              </span>
+            )}
           </div>
           <div className="divide-y divide-border/50">
             {filteredMarkets.map((market) => {
@@ -136,7 +187,8 @@ interface YfAsset {
 
 function CreateMarket() {
   const [priceSource, setPriceSource] = useState('yfinance')
-  const [creatorFee, setCreatorFee] = useState(20)
+  const [feeBpsStr, setFeeBpsStr] = useState('100')
+  const [creatorFeeStr, setCreatorFeeStr] = useState('20')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<YfAsset[]>([])
   const [asset, setAsset] = useState<YfAsset | null>(null)
@@ -145,6 +197,13 @@ function CreateMarket() {
 
   const seed = parseFloat(seedStr) || 0
   const seedTooLow = seedStr !== '' && seed < 100
+
+  // free-form fee inputs: never rewrite what the user typed, just flag out-of-bounds
+  const feeBps = /^\d+$/.test(feeBpsStr.trim()) ? parseInt(feeBpsStr.trim(), 10) : NaN
+  const feeBpsError = feeBpsStr.trim() !== '' && (isNaN(feeBps) || feeBps < 1 || feeBps > 1000)
+  const creatorFee = /^\d+$/.test(creatorFeeStr.trim()) ? parseInt(creatorFeeStr.trim(), 10) : NaN
+  const creatorFeeError = creatorFeeStr.trim() !== '' && (isNaN(creatorFee) || creatorFee > 50)
+  const feesIncomplete = feeBpsStr.trim() === '' || creatorFeeStr.trim() === ''
 
   useEffect(() => {
     if (priceSource !== 'yfinance' || !query.trim() || asset) {
@@ -279,6 +338,25 @@ function CreateMarket() {
 
         <Field label="fees">
           <div className="rounded-md border border-border bg-bg px-3 py-2.5 flex flex-col gap-1.5 text-[11px]">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted">
+                trading fee{' '}
+                {!isNaN(feeBps) && !feeBpsError && <span className="text-text">{(feeBps / 100).toFixed(2)}%</span>}
+              </span>
+              <div className="relative shrink-0">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={feeBpsStr}
+                  onChange={(e) => setFeeBpsStr(e.target.value)}
+                  placeholder="100"
+                  className={`w-20 bg-panel border rounded-md pl-2 pr-9 py-1 text-right text-text placeholder-muted/50 outline-none transition ${
+                    feeBpsError ? 'border-no focus:border-no' : 'border-border focus:border-muted'
+                  }`}
+                />
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted">bps</span>
+              </div>
+            </div>
             <div className="flex justify-between">
               <span className="text-muted">protocol fee</span>
               <span className="text-text">30% of trading fees · fixed</span>
@@ -287,26 +365,34 @@ function CreateMarket() {
               <span className="text-muted">creator fee</span>
               <div className="relative shrink-0">
                 <input
-                  type="number"
-                  min={0}
-                  max={50}
-                  value={creatorFee}
-                  onChange={(e) => setCreatorFee(Math.max(0, Math.min(50, parseInt(e.target.value) || 0)))}
-                  className="w-16 bg-panel border border-border rounded-md pl-2 pr-6 py-1 text-right text-text outline-none focus:border-muted transition"
+                  type="text"
+                  inputMode="numeric"
+                  value={creatorFeeStr}
+                  onChange={(e) => setCreatorFeeStr(e.target.value)}
+                  placeholder="20"
+                  className={`w-16 bg-panel border rounded-md pl-2 pr-6 py-1 text-right text-text placeholder-muted/50 outline-none transition ${
+                    creatorFeeError ? 'border-no focus:border-no' : 'border-border focus:border-muted'
+                  }`}
                 />
                 <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted">%</span>
               </div>
             </div>
             <div className="flex justify-between">
               <span className="text-muted">liquidity providers</span>
-              <span className="text-text">{70 - creatorFee}%</span>
+              <span className="text-text">{!isNaN(creatorFee) && !creatorFeeError ? `${70 - creatorFee}%` : '—'}</span>
             </div>
           </div>
-          <span className="text-[10px] text-muted">creator fee is your share of trading fees, max 50%</span>
+          {feeBpsError ? (
+            <span className="text-[10px] text-no">✗ trading fee must be a whole number between 1 and 1000 bps</span>
+          ) : creatorFeeError ? (
+            <span className="text-[10px] text-no">✗ creator fee must be a whole number between 0 and 50%</span>
+          ) : (
+            <span className="text-[10px] text-muted">trading fee is charged per trade (100 bps = 1%, the standard) and split protocol / creator / lps; creator share max 50%</span>
+          )}
         </Field>
 
         <button
-          disabled={seedTooLow || seed === 0}
+          disabled={seedTooLow || seed === 0 || feeBpsError || creatorFeeError || feesIncomplete}
           className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed"
         >
           REVIEW &amp; LAUNCH
