@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MARKETS } from '@/lib/data'
@@ -11,6 +12,21 @@ export default function MarketDetail() {
   const params = useParams()
   const id = params?.id as string
   const market = MARKETS.find(m => m.id === id)
+  const [liveOracle, setLiveOracle] = useState<number | null>(null)
+
+  const ticker = market?.sourceType === 'yfinance' ? market.sourceTicker : undefined
+  useEffect(() => {
+    if (!ticker) return
+    let cancelled = false
+    const load = () =>
+      fetch(`/api/yf-price?symbol=${encodeURIComponent(ticker)}`)
+        .then(r => r.json())
+        .then(d => { if (!cancelled && typeof d.price === 'number') setLiveOracle(d.price) })
+        .catch(() => {})
+    load()
+    const iv = setInterval(load, 30_000)
+    return () => { cancelled = true; clearInterval(iv) }
+  }, [ticker])
 
   if (!market) {
     return (
@@ -24,8 +40,12 @@ export default function MarketDetail() {
   }
 
   const up = market.change24h >= 0
-  // ponytail: mock oracle = mark * small fixed skew; replace with live feed read
-  const oraclePrice = market.price * 1.0018
+  // anchor the mock market to the live oracle: mark trades at a small skew under it.
+  // without this the chart squashes when the real price is far from the mock one.
+  const oraclePrice = liveOracle ?? market.price * 1.0018
+  const markPrice = liveOracle ? liveOracle / 1.0018 : market.price
+  const k = markPrice / market.price
+  const chartData = market.sparkline?.map((p) => p * k)
 
   return (
     <div className="flex flex-col gap-4">
@@ -50,7 +70,7 @@ export default function MarketDetail() {
               </div>
               <div className="text-right shrink-0">
                 <div className={`text-2xl font-semibold leading-none ${up ? 'text-yes' : 'text-no'}`}>
-                  ${market.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                  ${markPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}
                 </div>
                 <div className={`text-[10px] uppercase tracking-wide mt-1 ${up ? 'text-yes' : 'text-no'}`}>
                   {up ? '▲' : '▼'} {up ? '+' : ''}{market.change24h.toFixed(2)}% 24h
@@ -59,7 +79,7 @@ export default function MarketDetail() {
             </div>
 
             <div className="relative">
-              {market.sparkline && <Sparkline data={market.sparkline} isPositive={up} oracle={oraclePrice} />}
+              {chartData && <Sparkline data={chartData} isPositive={up} oracle={oraclePrice} />}
               <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-[#ff9f43]/40 rounded-md px-1.5 py-0.5 pointer-events-none">
                 <span className="text-[#ff9f43]">— oracle ${oraclePrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
                 <span className="text-muted ml-1.5">
@@ -79,13 +99,13 @@ export default function MarketDetail() {
             <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest font-mono">
               {market.sourceType === 'orderbook' ? '// orderbook — this book is the oracle' : '// orderbook'}
             </div>
-            <OrderBook price={market.price} />
+            <OrderBook price={markPrice} />
           </div>
         </div>
 
         <div className="md:col-span-1">
           <div className="border border-border rounded-xl bg-panel p-4 sticky top-20">
-            <BuySell symbol={market.symbol} price={market.price} />
+            <BuySell symbol={market.symbol} price={markPrice} />
           </div>
         </div>
       </div>
