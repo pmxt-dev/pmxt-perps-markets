@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { MARKETS } from '@/lib/data'
 import Sparkline from '@/components/Sparkline'
 import BuySell from '@/components/BuySell'
+import OrderBook from '@/components/OrderBook'
 
 export default function MarketDetail() {
   const params = useParams()
@@ -55,7 +56,17 @@ export default function MarketDetail() {
               </div>
             </div>
 
-            {market.sparkline && <Sparkline data={market.sparkline} isPositive={up} />}
+            <div className="relative">
+              {market.sparkline && <Sparkline data={market.sparkline} isPositive={up} />}
+              <div className="absolute top-1.5 left-1.5 text-[10px] text-muted bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
+                oracle:{' '}
+                {market.sourceType === 'yfinance' ? (
+                  <span className="text-text">yfinance · {market.sourceTicker}</span>
+                ) : (
+                  <span className="text-text">self (orderbook)</span>
+                )}
+              </div>
+            </div>
 
             <div className="p-3 border-t border-border flex justify-between text-[10px] text-muted">
               <span>vol {fmt(market.volume24h)}</span>
@@ -63,6 +74,15 @@ export default function MarketDetail() {
               <span>onchain · usdc</span>
             </div>
           </div>
+
+          {market.sourceType === 'orderbook' && (
+            <div className="border border-border rounded-xl bg-panel overflow-hidden mt-6">
+              <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest font-mono">
+                // orderbook — this book is the oracle
+              </div>
+              <OrderBook price={market.price} />
+            </div>
+          )}
         </div>
 
         <div className="md:col-span-1">

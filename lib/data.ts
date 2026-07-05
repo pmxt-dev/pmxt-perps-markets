@@ -19,6 +19,8 @@ const generateSparkline = (basePrice: number, volatility: number, points: number
 export const MARKETS: Market[] = [
   {
     id: 'btc-perp',
+    sourceType: 'yfinance',
+    sourceTicker: 'BTC-USD',
     symbol: 'BTC-PERP',
     asset: 'Bitcoin',
     category: 'Crypto',
@@ -32,6 +34,8 @@ export const MARKETS: Market[] = [
   },
   {
     id: 'eth-perp',
+    sourceType: 'yfinance',
+    sourceTicker: 'ETH-USD',
     symbol: 'ETH-PERP',
     asset: 'Ethereum',
     category: 'Crypto',
@@ -45,6 +49,7 @@ export const MARKETS: Market[] = [
   },
   {
     id: 'pmxt-perp',
+    sourceType: 'orderbook',
     symbol: 'PMXT-PERP',
     asset: 'PMXT (Pre-IPO)',
     category: 'Pre-IPO',
@@ -58,6 +63,7 @@ export const MARKETS: Market[] = [
   },
   {
     id: 'newco-perp',
+    sourceType: 'orderbook',
     symbol: 'NEWCO-PERP',
     asset: 'NewCo (Pre-IPO)',
     category: 'Pre-IPO',
@@ -71,6 +77,8 @@ export const MARKETS: Market[] = [
   },
   {
     id: 'ai16z-perp',
+    sourceType: 'yfinance',
+    sourceTicker: 'AI16Z-USD',
     symbol: 'AI16Z-PERP',
     asset: 'AI16Z',
     category: 'AI',
@@ -84,6 +92,8 @@ export const MARKETS: Market[] = [
   },
   {
     id: 'doge-perp',
+    sourceType: 'yfinance',
+    sourceTicker: 'DOGE-USD',
     symbol: 'DOGE-PERP',
     asset: 'Dogecoin',
     category: 'Community',
@@ -97,6 +107,8 @@ export const MARKETS: Market[] = [
   },
   {
     id: 'ai-index-perp',
+    sourceType: 'yfinance',
+    sourceTicker: '^AIDX',
     symbol: 'AI-INDEX-PERP',
     asset: 'AI Index',
     category: 'Indices',

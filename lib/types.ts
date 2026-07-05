@@ -10,6 +10,8 @@ export interface Market {
   qi: number
   sparkline?: number[]
   action: string
+  sourceType: 'yfinance' | 'orderbook'
+  sourceTicker?: string
 }
 
 export type Category = "All" | "Crypto" | "Pre-IPO" | "AI" | "Community" | "Indices"
