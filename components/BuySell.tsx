@@ -22,6 +22,8 @@ export default function BuySell({ symbol, price }: BuySellProps) {
 
   return (
     <div className="font-mono flex flex-col gap-3">
+      <h3 className="text-lg font-semibold">{side === 'buy' ? 'Buy' : 'Sell'} {symbol}</h3>
+
       <div className="flex items-end border-b border-gray-700">
         <button
           onClick={() => setSide('buy')}
