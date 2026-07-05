@@ -49,7 +49,7 @@ export default function MarketDetail() {
         </Link>
 
         <div className="grid grid-cols-3 gap-10">
-          <div className="lg:col-span-2 space-y-10">
+          <div className="col-span-2 space-y-10">
             <div className="border border-dark-border rounded-lg p-10">
               <div className="mb-10">
                 <h1 className="text-4xl font-semibold mb-2">{market.symbol}</h1>
@@ -96,7 +96,7 @@ export default function MarketDetail() {
             </div>
           </div>
 
-          <div className="lg:col-span-1">
+          <div className="col-span-1">
             <div className="sticky top-8">
               <BuySell symbol={market.symbol} price={market.price} />
             </div>

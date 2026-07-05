@@ -32,7 +32,7 @@ export default function Home() {
 
       <main className="max-w-7xl mx-auto px-8 py-10">
         <div className="grid grid-cols-3 gap-10">
-          <div className="lg:col-span-2 space-y-8">
+          <div className="col-span-2 space-y-8">
             <div>
               <h1 className="text-3xl font-semibold mb-3">Markets</h1>
               <p className="text-gray-500">Browse and trade perpetual futures across categories.</p>
