@@ -11,7 +11,7 @@ const BAYER = [
 interface SparklineProps {
   data: number[]
   isPositive?: boolean
-  oracle?: number
+  oracleSeries?: number[]
 }
 
 const COLS = 60
@@ -19,25 +19,32 @@ const ROWS = 22
 const CELL = 6
 const GAP = 1.2
 
-export default function Sparkline({ data, isPositive, oracle }: SparklineProps) {
+function sampleTo(data: number[], cols: number): number[] {
+  const out: number[] = []
+  for (let c = 0; c < cols; c++) {
+    const pos = (c / (cols - 1)) * (data.length - 1)
+    const idx = Math.floor(pos)
+    const frac = pos - idx
+    const a = data[idx]
+    const b = data[Math.min(idx + 1, data.length - 1)]
+    out.push(a * (1 - frac) + b * frac)
+  }
+  return out
+}
+
+export default function Sparkline({ data, isPositive, oracleSeries }: SparklineProps) {
   if (!data || data.length < 2) return null
 
-  const min = oracle !== undefined ? Math.min(...data, oracle) : Math.min(...data)
-  const max = oracle !== undefined ? Math.max(...data, oracle) : Math.max(...data)
+  const oracleOk = oracleSeries && oracleSeries.length >= 2
+  const all = oracleOk ? [...data, ...oracleSeries] : data
+  const min = Math.min(...all)
+  const max = Math.max(...all)
   const range = max - min || 1
 
   const w = COLS * CELL
   const h = ROWS * CELL
 
-  const sampled: number[] = []
-  for (let c = 0; c < COLS; c++) {
-    const pos = (c / (COLS - 1)) * (data.length - 1)
-    const idx = Math.floor(pos)
-    const frac = pos - idx
-    const a = data[idx]
-    const b = data[Math.min(idx + 1, data.length - 1)]
-    sampled.push(a * (1 - frac) + b * frac)
-  }
+  const sampled = sampleTo(data, COLS)
 
   const trend = isPositive ?? data[data.length - 1] >= data[0]
   const color = trend ? '#00d68f' : '#ff4d5e'
@@ -76,22 +83,27 @@ export default function Sparkline({ data, isPositive, oracle }: SparklineProps) 
     }
   }
 
-  const oracleY = oracle !== undefined
-    ? h - (((oracle - min) / range) * (ROWS - 2) + 1) * CELL
+  const oraclePoints = oracleOk
+    ? sampleTo(oracleSeries, COLS)
+        .map((v, c) => {
+          const y = h - (((v - min) / range) * (ROWS - 2) + 1) * CELL
+          return `${c * CELL + CELL / 2},${y}`
+        })
+        .join(' ')
     : null
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full block" preserveAspectRatio="none">
       {dots}
-      {oracleY !== null && (
-        <line
-          x1={0}
-          x2={w}
-          y1={oracleY}
-          y2={oracleY}
+      {oraclePoints && (
+        <polyline
+          points={oraclePoints}
+          fill="none"
           stroke="#ff9f43"
-          strokeWidth={2.5}
-          strokeDasharray="6 4"
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          opacity={0.95}
         />
       )}
     </svg>

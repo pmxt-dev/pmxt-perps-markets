@@ -8,25 +8,34 @@ import Sparkline from '@/components/Sparkline'
 import BuySell from '@/components/BuySell'
 import OrderBook from '@/components/OrderBook'
 
+const TIMEFRAMES = ['1h', '7d', '30d', '1y', '5y', 'all'] as const
+type Timeframe = (typeof TIMEFRAMES)[number]
+
 export default function MarketDetail() {
   const params = useParams()
   const id = params?.id as string
   const market = MARKETS.find(m => m.id === id)
   const [liveOracle, setLiveOracle] = useState<number | null>(null)
+  const [tf, setTf] = useState<Timeframe>('7d')
+  const [history, setHistory] = useState<number[] | null>(null)
 
   const ticker = market?.sourceType === 'yfinance' ? market.sourceTicker : undefined
   useEffect(() => {
     if (!ticker) return
     let cancelled = false
     const load = () =>
-      fetch(`/api/yf-price?symbol=${encodeURIComponent(ticker)}`)
+      fetch(`/api/yf-history?symbol=${encodeURIComponent(ticker)}&tf=${tf}`)
         .then(r => r.json())
-        .then(d => { if (!cancelled && typeof d.price === 'number') setLiveOracle(d.price) })
+        .then(d => {
+          if (cancelled) return
+          if (Array.isArray(d.closes) && d.closes.length >= 2) setHistory(d.closes)
+          if (typeof d.price === 'number') setLiveOracle(d.price)
+        })
         .catch(() => {})
     load()
     const iv = setInterval(load, 30_000)
     return () => { cancelled = true; clearInterval(iv) }
-  }, [ticker])
+  }, [ticker, tf])
 
   if (!market) {
     return (
@@ -39,13 +48,20 @@ export default function MarketDetail() {
     )
   }
 
-  const up = market.change24h >= 0
-  // anchor the mock market to the live oracle: mark trades at a small skew under it.
-  // without this the chart squashes when the real price is far from the mock one.
+  const isYf = market.sourceType === 'yfinance'
   const oraclePrice = liveOracle ?? market.price * 1.0018
   const markPrice = liveOracle ? liveOracle / 1.0018 : market.price
-  const k = markPrice / market.price
-  const chartData = market.sparkline?.map((p) => p * k)
+  // yfinance markets: chart = real history (mark = oracle / skew), oracle drawn as line series.
+  // orderbook markets: static mock walk, no external oracle to overlay.
+  const chartData = isYf && history
+    ? history.map((p) => p / 1.0018)
+    : market.sparkline?.map((p) => p * (markPrice / market.price))
+  const oracleSeries = isYf && history ? history : undefined
+  const changePct = isYf && history
+    ? ((history[history.length - 1] - history[0]) / history[0]) * 100
+    : market.change24h
+  const up = changePct >= 0
+  const changeLabel = isYf && history ? tf : '24h'
 
   return (
     <div className="flex flex-col gap-4">
@@ -73,13 +89,29 @@ export default function MarketDetail() {
                   ${markPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}
                 </div>
                 <div className={`text-[10px] uppercase tracking-wide mt-1 ${up ? 'text-yes' : 'text-no'}`}>
-                  {up ? '▲' : '▼'} {up ? '+' : ''}{market.change24h.toFixed(2)}% 24h
+                  {up ? '▲' : '▼'} {up ? '+' : ''}{changePct.toFixed(2)}% {changeLabel}
                 </div>
               </div>
             </div>
 
+            {isYf && (
+              <div className="px-4 pb-2 flex gap-1.5 font-mono">
+                {TIMEFRAMES.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTf(t)}
+                    className={`text-[10px] px-2 py-0.5 rounded-md border transition ${
+                      tf === t ? 'border-accent text-accent bg-accent/10' : 'border-border text-muted hover:text-text'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="relative">
-              {chartData && <Sparkline data={chartData} isPositive={up} oracle={oraclePrice} />}
+              {chartData && <Sparkline data={chartData} isPositive={up} oracleSeries={oracleSeries} />}
               <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-[#ff9f43]/40 rounded-md px-1.5 py-0.5 pointer-events-none">
                 <span className="text-[#ff9f43]">— oracle ${oraclePrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
                 <span className="text-muted ml-1.5">
