@@ -2,8 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
-  @apply bg-dark-bg text-white;
+  @apply bg-dark-bg text-white font-sans;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
 }
 
 ::-webkit-scrollbar {
@@ -15,9 +30,5 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-dark-border rounded-full;
-}
-
-.gradient-text {
-  @apply bg-gradient-to-r from-green-400 to-green-500 bg-clip-text text-transparent;
+  @apply bg-dark-border rounded-full hover:bg-gray-600;
 }

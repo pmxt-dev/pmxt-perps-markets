@@ -1,5 +1,16 @@
 import { Market } from './types'
 
+const generateSparkline = (basePrice: number, volatility: number, points: number = 24) => {
+  const data = []
+  let price = basePrice
+  for (let i = 0; i < points; i++) {
+    const change = (Math.random() - 0.5) * volatility
+    price = price * (1 + change)
+    data.push(price)
+  }
+  return data
+}
+
 export const MARKETS: Market[] = [
   {
     id: 'btc-perp',
@@ -12,6 +23,7 @@ export const MARKETS: Market[] = [
     volume24h: 4.21e9,
     qi: 832.1e6,
     action: 'Trade',
+    sparkline: generateSparkline(112458.70, 0.015),
   },
   {
     id: 'eth-perp',
@@ -24,6 +36,7 @@ export const MARKETS: Market[] = [
     volume24h: 2.17e9,
     qi: 512.37e6,
     action: 'Trade',
+    sparkline: generateSparkline(3842.16, 0.028),
   },
   {
     id: 'pmxt-perp',
@@ -36,6 +49,7 @@ export const MARKETS: Market[] = [
     volume24h: 120.53e6,
     qi: 89.24e6,
     action: 'Trade',
+    sparkline: generateSparkline(0.4231, 0.032),
   },
   {
     id: 'newco-perp',
@@ -48,6 +62,7 @@ export const MARKETS: Market[] = [
     volume24h: 8.21e6,
     qi: 12.33e6,
     action: 'Trade',
+    sparkline: generateSparkline(1.036, 0.021),
   },
   {
     id: 'ai16z-perp',
@@ -60,6 +75,7 @@ export const MARKETS: Market[] = [
     volume24h: 65.82e6,
     qi: 45.11e6,
     action: 'Trade',
+    sparkline: generateSparkline(0.1872, 0.069),
   },
   {
     id: 'doge-perp',
@@ -72,6 +88,7 @@ export const MARKETS: Market[] = [
     volume24h: 42.69e6,
     qi: 31.22e6,
     action: 'Trade',
+    sparkline: generateSparkline(0.1587, 0.017),
   },
   {
     id: 'ai-index-perp',
@@ -84,6 +101,7 @@ export const MARKETS: Market[] = [
     volume24h: 18.37e9,
     qi: 15.67e6,
     action: 'Trade',
+    sparkline: generateSparkline(1248.36, 0.009),
   },
 ]
 

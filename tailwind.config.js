@@ -8,14 +8,17 @@ module.exports = {
     extend: {
       colors: {
         dark: {
-          bg: '#0a0e27',
-          surface: '#1a1f3a',
-          border: '#2d3548',
+          bg: '#0f0f0f',
+          surface: '#1a1a1a',
+          border: '#2a2a2a',
         },
         accent: {
-          green: '#10b981',
+          primary: '#10b981',
           red: '#ef4444',
         }
+      },
+      fontFamily: {
+        sans: ['system-ui', 'sans-serif'],
       },
     },
   },

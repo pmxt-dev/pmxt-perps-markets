@@ -8,7 +8,7 @@ export interface Market {
   change24h: number
   volume24h: number
   qi: number
-  chart?: number[]
+  sparkline?: number[]
   action: string
 }
 
