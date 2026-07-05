@@ -20,22 +20,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="font-mono text-sm tracking-tight text-text">
               pmxt<span className="text-accent">·</span>perps
             </Link>
-            <nav className="hidden md:flex gap-5 text-xs text-muted font-mono">
-              <Link href="/" className="hover:text-text">markets</Link>
-              <a href="#" className="hover:text-text">docs</a>
-              <a href="#" className="hover:text-text">api</a>
-            </nav>
             <div className="flex-1" />
-            <span className="hidden sm:inline text-[10px] text-muted font-mono">arbitrum one</span>
             <button className="font-mono text-xs border border-border rounded-md px-3 py-1.5 text-muted hover:text-text hover:border-muted transition">
               connect wallet
             </button>
           </div>
         </header>
         <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
-        <footer className="max-w-6xl mx-auto px-4 py-10 text-[10px] text-muted font-mono">
-          not financial advice · launch and trade perps permissionlessly · usdc-settled on arbitrum
-        </footer>
       </body>
     </html>
   )
