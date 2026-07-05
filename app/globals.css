@@ -9,10 +9,13 @@
 
 html {
   overflow-y: scroll;
+  width: 100vw;
+  overflow-x: hidden;
 }
 
 body {
   @apply bg-dark-bg text-white font-sans;
+  width: 100%;
 }
 
 main {
