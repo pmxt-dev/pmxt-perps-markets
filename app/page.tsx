@@ -16,6 +16,7 @@ interface LiveQuote {
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All')
   const [live, setLive] = useState<Record<string, LiveQuote>>({})
+  const [liquidity, setLiquidity] = useState<Record<string, number>>({})
   const [chainError, setChainError] = useState<string | null>(null)
 
   // list must show the same live price the detail page shows — mock values only remain
@@ -84,6 +85,22 @@ export default function Home() {
       .catch(e => {
         if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
       })
+    // total resting liquidity per market: Σ size × level price over both book sides —
+    // same number the detail page shows, from the same chain book
+    MARKETS.forEach(m => {
+      if (m.sourceType !== 'onchain' || !m.chainSymbol) return
+      fetch(`/api/chain-book?symbol=${encodeURIComponent(m.chainSymbol)}`)
+        .then(async r => {
+          const d = await r.json()
+          if (cancelled || !r.ok || !Array.isArray(d.bids) || !Array.isArray(d.asks)) return
+          const notional = [...d.bids, ...d.asks].reduce(
+            (sum: number, l: { price: number; size: number }) => sum + l.size * l.price,
+            0,
+          )
+          setLiquidity(prev => ({ ...prev, [m.id]: notional }))
+        })
+        .catch(() => {})
+    })
     return () => { cancelled = true }
   }, [])
 
@@ -151,8 +168,8 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="text-right shrink-0 w-20 hidden sm:block">
-                    <div className="text-muted">{fmt(market.volume24h)}</div>
-                    <div className="text-[10px] text-muted mt-0.5">24h vol</div>
+                    <div className="text-muted">{liquidity[market.id] !== undefined ? fmt(liquidity[market.id]) : '—'}</div>
+                    <div className="text-[10px] text-muted mt-0.5">liquidity</div>
                   </div>
                   <span className="shrink-0 text-[10px] px-2 py-1 rounded-md border border-accent/40 text-accent">
                     trade
