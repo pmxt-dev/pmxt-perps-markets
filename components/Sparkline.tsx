@@ -11,6 +11,7 @@ const BAYER = [
 interface SparklineProps {
   data: number[]
   isPositive?: boolean
+  oracle?: number
 }
 
 const COLS = 60
@@ -18,11 +19,11 @@ const ROWS = 22
 const CELL = 6
 const GAP = 1.2
 
-export default function Sparkline({ data, isPositive }: SparklineProps) {
+export default function Sparkline({ data, isPositive, oracle }: SparklineProps) {
   if (!data || data.length < 2) return null
 
-  const min = Math.min(...data)
-  const max = Math.max(...data)
+  const min = oracle !== undefined ? Math.min(...data, oracle) : Math.min(...data)
+  const max = oracle !== undefined ? Math.max(...data, oracle) : Math.max(...data)
   const range = max - min || 1
 
   const w = COLS * CELL
@@ -75,9 +76,24 @@ export default function Sparkline({ data, isPositive }: SparklineProps) {
     }
   }
 
+  const oracleY = oracle !== undefined
+    ? h - (((oracle - min) / range) * (ROWS - 2) + 1) * CELL
+    : null
+
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full block" preserveAspectRatio="none">
       {dots}
+      {oracleY !== null && (
+        <line
+          x1={0}
+          x2={w}
+          y1={oracleY}
+          y2={oracleY}
+          stroke="#ff9f43"
+          strokeWidth={2.5}
+          strokeDasharray="6 4"
+        />
+      )}
     </svg>
   )
 }

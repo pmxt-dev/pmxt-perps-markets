@@ -13,7 +13,9 @@ const generateSparkline = (basePrice: number, volatility: number, points: number
     price = price * (1 + (rand() - 0.5) * volatility)
     data.push(price)
   }
-  return data
+  // rescale so the walk ends exactly at the current market price
+  const k = basePrice / data[data.length - 1]
+  return data.map((p) => p * k)
 }
 
 export const MARKETS: Market[] = [

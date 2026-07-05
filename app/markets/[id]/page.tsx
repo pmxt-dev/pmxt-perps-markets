@@ -24,6 +24,8 @@ export default function MarketDetail() {
   }
 
   const up = market.change24h >= 0
+  // ponytail: mock oracle = mark * small fixed skew; replace with live feed read
+  const oraclePrice = market.price * 1.0018
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,14 +59,12 @@ export default function MarketDetail() {
             </div>
 
             <div className="relative">
-              {market.sparkline && <Sparkline data={market.sparkline} isPositive={up} />}
-              <div className="absolute top-1.5 left-1.5 text-[10px] text-muted bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
-                oracle:{' '}
-                {market.sourceType === 'yfinance' ? (
-                  <span className="text-text">yfinance · {market.sourceTicker}</span>
-                ) : (
-                  <span className="text-text">self (orderbook)</span>
-                )}
+              {market.sparkline && <Sparkline data={market.sparkline} isPositive={up} oracle={oraclePrice} />}
+              <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-[#ff9f43]/40 rounded-md px-1.5 py-0.5 pointer-events-none">
+                <span className="text-[#ff9f43]">— oracle ${oraclePrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                <span className="text-muted ml-1.5">
+                  {market.sourceType === 'yfinance' ? `yfinance · ${market.sourceTicker}` : 'self (orderbook)'}
+                </span>
               </div>
             </div>
 
@@ -75,14 +75,12 @@ export default function MarketDetail() {
             </div>
           </div>
 
-          {market.sourceType === 'orderbook' && (
-            <div className="border border-border rounded-xl bg-panel overflow-hidden mt-6">
-              <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest font-mono">
-                // orderbook — this book is the oracle
-              </div>
-              <OrderBook price={market.price} />
+          <div className="border border-border rounded-xl bg-panel overflow-hidden mt-6">
+            <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest font-mono">
+              {market.sourceType === 'orderbook' ? '// orderbook — this book is the oracle' : '// orderbook'}
             </div>
-          )}
+            <OrderBook price={market.price} />
+          </div>
         </div>
 
         <div className="md:col-span-1">

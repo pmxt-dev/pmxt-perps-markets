@@ -15,7 +15,6 @@ const QUICK = [1, 5, 10, 50] as const
 export default function BuySell({ symbol, price }: BuySellProps) {
   const [side, setSide] = useState<'long' | 'short'>('long')
   const [amountStr, setAmountStr] = useState('')
-  const [leverage, setLeverage] = useState(1)
 
   const { connection } = useConnection()
   const { publicKey, connected } = useWallet()
@@ -36,7 +35,7 @@ export default function BuySell({ symbol, price }: BuySellProps) {
   }, [publicKey, connection])
 
   const amount = parseFloat(amountStr) || 0
-  const notional = amount * leverage
+  const notional = amount
   const contracts = price > 0 ? notional / price : 0
 
   const isLong = side === 'long'
@@ -73,7 +72,6 @@ export default function BuySell({ symbol, price }: BuySellProps) {
 
       <div className="flex justify-between text-[11px] text-muted">
         <span>entry <span className="text-text">${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span></span>
-        <span>max lev <span className="text-text">20x</span></span>
       </div>
 
       {connected && (
@@ -106,21 +104,6 @@ export default function BuySell({ symbol, price }: BuySellProps) {
             +${v}
           </button>
         ))}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-text">leverage</span>
-          <span className={`text-sm font-semibold ${theme.text}`}>{leverage}x</span>
-        </div>
-        <input
-          type="range"
-          min="1"
-          max="20"
-          value={leverage}
-          onChange={(e) => setLeverage(parseInt(e.target.value))}
-          className="w-full cursor-pointer accent-accent"
-        />
       </div>
 
       <div className="flex items-end justify-between border-t border-border pt-3">
