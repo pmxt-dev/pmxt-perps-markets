@@ -1,6 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useConnection, useWallet } from '@solana/wallet-adapter-react'
+import { useWalletModal } from '@solana/wallet-adapter-react-ui'
+import { LAMPORTS_PER_SOL } from '@solana/web3.js'
 
 interface BuySellProps {
   symbol: string
@@ -13,6 +16,24 @@ export default function BuySell({ symbol, price }: BuySellProps) {
   const [side, setSide] = useState<'long' | 'short'>('long')
   const [amountStr, setAmountStr] = useState('')
   const [leverage, setLeverage] = useState(1)
+
+  const { connection } = useConnection()
+  const { publicKey, connected } = useWallet()
+  const { setVisible } = useWalletModal()
+  const [balance, setBalance] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!publicKey) {
+      setBalance(null)
+      return
+    }
+    let cancelled = false
+    connection
+      .getBalance(publicKey)
+      .then((lamports) => { if (!cancelled) setBalance(lamports / LAMPORTS_PER_SOL) })
+      .catch(() => { if (!cancelled) setBalance(null) })
+    return () => { cancelled = true }
+  }, [publicKey, connection])
 
   const amount = parseFloat(amountStr) || 0
   const notional = amount * leverage
@@ -54,6 +75,13 @@ export default function BuySell({ symbol, price }: BuySellProps) {
         <span>entry <span className="text-text">${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span></span>
         <span>max lev <span className="text-text">20x</span></span>
       </div>
+
+      {connected && (
+        <div className="flex justify-between text-[11px] text-muted">
+          <span>balance</span>
+          <span className="text-text">{balance !== null ? `◎ ${balance.toFixed(4)}` : '…'}</span>
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-text">margin</span>
@@ -105,14 +133,21 @@ export default function BuySell({ symbol, price }: BuySellProps) {
         </div>
       </div>
 
-      <button
-        disabled={amount <= 0}
-        className={`w-full rounded-xl ${theme.bg} px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed`}
-      >
-        {isLong ? 'OPEN LONG' : 'OPEN SHORT'}
-      </button>
-
-      <p className="text-[10px] text-muted text-center">connect wallet to trade</p>
+      {connected ? (
+        <button
+          disabled={amount <= 0}
+          className={`w-full rounded-xl ${theme.bg} px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed`}
+        >
+          {isLong ? 'OPEN LONG' : 'OPEN SHORT'}
+        </button>
+      ) : (
+        <button
+          onClick={() => setVisible(true)}
+          className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none"
+        >
+          CONNECT WALLET
+        </button>
+      )}
     </div>
   )
 }

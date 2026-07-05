@@ -13,3 +13,14 @@ input::-webkit-inner-spin-button {
   margin: 0;
 }
 input[type=number] { -moz-appearance: textfield; }
+
+/* wallet-adapter modal → terminal theme */
+.wallet-adapter-modal-wrapper {
+  background: #0d0f0e;
+  border: 1px solid #1a2320;
+  border-radius: 0.75rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+.wallet-adapter-modal-title { color: #eef4f1; font-size: 14px; }
+.wallet-adapter-button { font-family: inherit; }
+.wallet-adapter-modal-list .wallet-adapter-button:hover { background: rgba(255,255,255,0.03); }
