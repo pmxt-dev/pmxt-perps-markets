@@ -105,6 +105,10 @@ function CreateMarket() {
   const [results, setResults] = useState<YfAsset[]>([])
   const [asset, setAsset] = useState<YfAsset | null>(null)
   const [searching, setSearching] = useState(false)
+  const [seedStr, setSeedStr] = useState('')
+
+  const seed = parseFloat(seedStr) || 0
+  const seedTooLow = seedStr !== '' && seed < 100
 
   useEffect(() => {
     if (priceSource !== 'yfinance' || !query.trim() || asset) {
@@ -213,13 +217,20 @@ function CreateMarket() {
           </Field>
         )}
 
-        <Field label="seed liquidity (usdc)" hint="minimum 100 usdc">
+        <Field label="seed liquidity (usdc)">
           <input
             type="number"
             min={100}
+            value={seedStr}
+            onChange={(e) => setSeedStr(e.target.value)}
             placeholder="100"
-            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
+            className={`w-full bg-bg border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none transition ${
+              seedTooLow ? 'border-no focus:border-no' : 'border-border focus:border-muted'
+            }`}
           />
+          <span className={`text-[10px] ${seedTooLow ? 'text-no' : 'text-muted'}`}>
+            {seedTooLow ? `✗ minimum 100 usdc — you entered $${seed}` : 'minimum 100 usdc'}
+          </span>
         </Field>
 
         <Field label="fees">
@@ -250,7 +261,10 @@ function CreateMarket() {
           <span className="text-[10px] text-muted">creator fee is your share of trading fees, max 50%</span>
         </Field>
 
-        <button className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none">
+        <button
+          disabled={seedTooLow || seed === 0}
+          className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed"
+        >
           REVIEW &amp; LAUNCH
         </button>
         <p className="text-[10px] text-muted text-center">you&apos;ll confirm in your wallet</p>
