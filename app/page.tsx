@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { MARKETS, CATEGORIES } from '@/lib/data'
 import { Category } from '@/lib/types'
@@ -91,9 +91,37 @@ export default function Home() {
   )
 }
 
+interface YfAsset {
+  symbol: string
+  name: string
+  exchange: string
+  type: string
+}
+
 function CreateMarket() {
   const [priceSource, setPriceSource] = useState('yfinance')
   const [creatorFee, setCreatorFee] = useState(20)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<YfAsset[]>([])
+  const [asset, setAsset] = useState<YfAsset | null>(null)
+  const [searching, setSearching] = useState(false)
+
+  useEffect(() => {
+    if (priceSource !== 'yfinance' || !query.trim() || asset) {
+      setResults([])
+      return
+    }
+    setSearching(true)
+    const id = setTimeout(() => {
+      fetch(`/api/yf-search?q=${encodeURIComponent(query.trim())}`)
+        .then(r => r.json())
+        .then(d => setResults(d.results ?? []))
+        .catch(() => setResults([]))
+        .finally(() => setSearching(false))
+    }, 300)
+    return () => { clearTimeout(id); setSearching(false) }
+  }, [query, priceSource, asset])
+
   return (
     <aside className="border border-border rounded-xl bg-panel overflow-hidden font-mono sticky top-20">
       <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
@@ -135,6 +163,55 @@ function CreateMarket() {
             <option value="custom-api" disabled>custom api — coming soon</option>
           </select>
         </Field>
+
+        {priceSource === 'yfinance' && (
+          <Field label="asset">
+            {asset ? (
+              <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/5 px-3 py-2">
+                <div className="min-w-0">
+                  <span className="text-accent text-sm">{asset.symbol}</span>
+                  <span className="text-muted text-[11px] ml-2 truncate">{asset.name}</span>
+                </div>
+                <button
+                  onClick={() => { setAsset(null); setQuery('') }}
+                  className="text-muted hover:text-no transition ml-2 shrink-0"
+                  aria-label="clear asset"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="search ticker or name — AAPL, bitcoin…"
+                  className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
+                />
+                {(results.length > 0 || searching) && query.trim() && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-10 border border-border rounded-md bg-panel overflow-hidden max-h-56 overflow-y-auto">
+                    {searching && results.length === 0 && (
+                      <div className="px-3 py-2 text-[11px] text-muted">searching…</div>
+                    )}
+                    {results.map((r) => (
+                      <button
+                        key={r.symbol}
+                        onClick={() => { setAsset(r); setResults([]) }}
+                        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/[0.03] transition"
+                      >
+                        <span className="text-text text-sm">{r.symbol}</span>
+                        <span className="text-muted text-[10px] truncate ml-3">
+                          {r.name}{r.exchange ? ` · ${r.exchange.toLowerCase()}` : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Field>
+        )}
 
         <Field label="seed liquidity (usdc)" hint="minimum 100 usdc">
           <input
