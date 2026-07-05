@@ -1,5 +1,8 @@
 'use client'
 
+import { useState } from 'react'
+import { fmtPrice } from '@/lib/format'
+
 // ponytail: ported from exchange-web Sparkline, normalized to arbitrary price ranges
 const BAYER = [
   [0, 8, 2, 10],
@@ -33,6 +36,7 @@ function sampleTo(data: number[], cols: number): number[] {
 }
 
 export default function Sparkline({ data, isPositive, oracleSeries }: SparklineProps) {
+  const [hover, setHover] = useState<number | null>(null)
   if (!data || data.length < 2) return null
 
   const oracleOk = oracleSeries && oracleSeries.length >= 2
@@ -45,6 +49,7 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
   const h = ROWS * CELL
 
   const sampled = sampleTo(data, COLS)
+  const sampledOracle = oracleOk ? sampleTo(oracleSeries, COLS) : null
 
   const trend = isPositive ?? data[data.length - 1] >= data[0]
   const color = trend ? '#00d68f' : '#ff4d5e'
@@ -83,8 +88,8 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
     }
   }
 
-  const oraclePoints = oracleOk
-    ? sampleTo(oracleSeries, COLS)
+  const oraclePoints = sampledOracle
+    ? sampledOracle
         .map((v, c) => {
           const y = h - (((v - min) / range) * (ROWS - 2) + 1) * CELL
           return `${c * CELL + CELL / 2},${y}`
@@ -92,20 +97,55 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
         .join(' ')
     : null
 
+  function onMove(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const col = Math.max(0, Math.min(COLS - 1, Math.round((x / rect.width) * (COLS - 1))))
+    setHover(col)
+  }
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full block" preserveAspectRatio="none">
-      {dots}
-      {oraclePoints && (
-        <polyline
-          points={oraclePoints}
-          fill="none"
-          stroke="#ff9f43"
-          strokeWidth={2}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          opacity={0.95}
-        />
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className="w-full block"
+        preserveAspectRatio="none"
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+      >
+        {dots}
+        {oraclePoints && (
+          <polyline
+            points={oraclePoints}
+            fill="none"
+            stroke="#ff9f43"
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            opacity={0.95}
+          />
+        )}
+        {hover != null && (
+          <line
+            x1={hover * CELL + CELL / 2}
+            x2={hover * CELL + CELL / 2}
+            y1={0}
+            y2={h}
+            stroke="#e8e8ea"
+            strokeWidth={0.6}
+            strokeDasharray="2 3"
+            opacity={0.55}
+          />
+        )}
+      </svg>
+      {hover != null && (
+        <div className="absolute top-1.5 right-1.5 font-mono text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
+          <span className={trend ? 'text-yes' : 'text-no'}>${fmtPrice(sampled[hover])}</span>
+          {sampledOracle && (
+            <span className="text-[#ff9f43] ml-1.5">oracle ${fmtPrice(sampledOracle[hover])}</span>
+          )}
+        </div>
       )}
-    </svg>
+    </div>
   )
 }
