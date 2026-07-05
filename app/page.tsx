@@ -65,34 +65,36 @@ export default function Home() {
                     <th className="px-6 py-4 text-left font-medium text-gray-500 text-xs uppercase">Action</th>
                   </tr>
                 </thead>
-                <tbody divide-y divide-dark-border>
+                <tbody>
                   {filteredMarkets.map((market) => (
-                    <Link
-                      key={market.id}
-                      href={`/markets/${market.id}`}
-                      className="block hover:bg-dark-surface/50 transition cursor-pointer border-b border-dark-border last:border-b-0"
-                    >
-                      <div className="px-6 py-4 grid gap-4" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 0.8fr' }}>
-                        <div className="min-w-0">
+                    <tr key={market.id} className="border-b border-dark-border hover:bg-dark-surface/50 transition cursor-pointer">
+                      <td className="px-6 py-4">
+                        <Link href={`/markets/${market.id}`} className="block">
                           <div className="font-medium text-white truncate">{market.symbol}</div>
                           <div className="text-xs text-gray-500 truncate">{market.asset}</div>
-                        </div>
-                        <div className="text-white font-medium">
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link href={`/markets/${market.id}`} className="block text-white font-medium">
                           ${market.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                        </div>
-                        <div className="text-gray-400">
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link href={`/markets/${market.id}`} className="block text-gray-400">
                           ${formatBigNumber(market.volume24h)}
-                        </div>
-                        <div className={`font-medium ${market.change24h >= 0 ? 'text-accent-primary' : 'text-accent-red'}`}>
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link href={`/markets/${market.id}`} className={`block font-medium ${market.change24h >= 0 ? 'text-accent-primary' : 'text-accent-red'}`}>
                           {market.change24h >= 0 ? '+' : ''}{market.change24h.toFixed(2)}%
-                        </div>
-                        <div className="text-right" onClick={(e) => e.preventDefault()}>
-                          <button className="px-4 py-1.5 text-sm rounded bg-accent-primary text-dark-bg font-medium hover:opacity-90 transition">
-                            Trade
-                          </button>
-                        </div>
-                      </div>
-                    </Link>
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button onClick={() => window.location.href = `/markets/${market.id}`} className="px-4 py-1.5 text-sm rounded bg-accent-primary text-dark-bg font-medium hover:opacity-90 transition">
+                          Trade
+                        </button>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
