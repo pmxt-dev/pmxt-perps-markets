@@ -7,6 +7,10 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   @apply bg-dark-bg text-white font-sans;
 }
