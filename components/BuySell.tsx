@@ -7,103 +7,112 @@ interface BuySellProps {
   price: number
 }
 
+const QUICK = [1, 5, 10, 50] as const
+
 export default function BuySell({ symbol, price }: BuySellProps) {
-  const [side, setSide] = useState<'buy' | 'sell'>('buy')
-  const [size, setSize] = useState('')
+  const [side, setSide] = useState<'long' | 'short'>('long')
+  const [amountStr, setAmountStr] = useState('')
   const [leverage, setLeverage] = useState(1)
 
-  const notional = parseFloat(size) * price || 0
-  const margin = notional / leverage || 0
+  const amount = parseFloat(amountStr) || 0
+  const notional = amount * leverage
+  const contracts = price > 0 ? notional / price : 0
 
-  const isBuy = side === 'buy'
-  const theme = isBuy
-    ? { bg: 'bg-accent-primary', text: 'text-accent-primary' }
-    : { bg: 'bg-accent-red', text: 'text-accent-red' }
+  const isLong = side === 'long'
+  const theme = isLong
+    ? { bg: 'bg-yes', text: 'text-yes', tint: 'bg-yes/10', border: 'border-yes/40' }
+    : { bg: 'bg-no', text: 'text-no', tint: 'bg-no/10', border: 'border-no/40' }
 
   return (
     <div className="font-mono flex flex-col gap-3">
-      <h3 className="text-lg font-semibold">{side === 'buy' ? 'Buy' : 'Sell'} {symbol}</h3>
+      <div className="flex items-end border-b border-border">
+        <span className="px-1 pb-2 text-sm font-semibold text-text tracking-wider truncate">{symbol}</span>
+        <div className="flex-1" />
+        <span className="pb-2 text-[10px] text-muted uppercase tracking-widest">market</span>
+      </div>
 
-      <div className="flex items-end border-b border-gray-700">
+      <div className="flex gap-2">
         <button
-          onClick={() => setSide('buy')}
-          className={`px-3 pb-2 -mb-px border-b-2 text-sm font-semibold transition tracking-wider ${
-            isBuy ? 'border-accent-primary text-white' : 'border-transparent text-gray-500 hover:text-gray-400'
+          onClick={() => setSide('long')}
+          className={`flex-1 py-2 rounded-md text-sm border transition ${
+            isLong ? 'bg-yes/15 border-yes text-yes' : 'border-border text-muted hover:text-text'
           }`}
         >
-          BUY
+          ▲ LONG
         </button>
         <button
-          onClick={() => setSide('sell')}
-          className={`px-3 pb-2 -mb-px border-b-2 text-sm font-semibold transition tracking-wider ${
-            !isBuy ? 'border-accent-red text-white' : 'border-transparent text-gray-500 hover:text-gray-400'
+          onClick={() => setSide('short')}
+          className={`flex-1 py-2 rounded-md text-sm border transition ${
+            !isLong ? 'bg-no/15 border-no text-no' : 'border-border text-muted hover:text-text'
           }`}
         >
-          SELL
+          ▼ SHORT
         </button>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <div className="text-sm text-gray-400 mb-2">ENTRY PRICE</div>
-          <div className="text-3xl font-bold">
-            ${price.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-          </div>
-        </div>
+      <div className="flex justify-between text-[11px] text-muted">
+        <span>entry <span className="text-text">${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span></span>
+        <span>max lev <span className="text-text">20x</span></span>
+      </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <span className="text-sm text-gray-300">size (contracts)</span>
-            <div className="relative shrink-0">
-              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-base font-semibold text-white">$</span>
-              <input
-                type="number"
-                value={size}
-                onChange={(e) => setSize(e.target.value.replace(/[^0-9.]/g, ''))}
-                placeholder="0.00"
-                className="w-40 bg-black border border-gray-700 rounded-md pl-7 pr-3 py-2 text-right text-base font-semibold text-white outline-none focus:border-accent-primary transition"
-              />
-            </div>
-          </div>
-          <div className="text-xs text-gray-500 text-right">
-            Notional: ${notional.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-          </div>
-        </div>
-
-        <div className="border-t border-gray-700 pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-sm text-gray-300">leverage</label>
-            <span className="text-sm text-accent-primary font-semibold">{leverage}x</span>
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-text">margin</span>
+        <div className="relative shrink-0">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-base font-semibold text-text">$</span>
           <input
-            type="range"
-            min="1"
-            max="20"
-            value={leverage}
-            onChange={(e) => setLeverage(parseInt(e.target.value))}
-            className="w-full cursor-pointer accent-accent-primary"
+            inputMode="decimal"
+            value={amountStr}
+            onChange={(e) => setAmountStr(e.target.value.replace(/[^0-9.]/g, ''))}
+            placeholder="0.00"
+            className="w-32 bg-bg border border-border rounded-md pl-7 pr-3 py-2 text-right text-base font-semibold text-text outline-none focus:border-muted"
           />
-          <div className="text-xs text-gray-500 mt-2 text-right">Max Leverage: 20x</div>
         </div>
-
-        <div className="rounded-md border border-gray-700 bg-black/30 px-3 py-3">
-          <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">MARGIN REQUIRED</div>
-          <div className="text-2xl font-bold">
-            ${margin.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDC
-          </div>
-        </div>
-
-        <button
-          className={`w-full rounded-xl px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none ${
-            !size || margin <= 0 ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'
-          } ${theme.bg}`}
-          disabled={!size || margin <= 0}
-        >
-          {isBuy ? 'OPEN LONG' : 'OPEN SHORT'}
-        </button>
-
-        <p className="text-xs text-gray-500 text-center">Connect wallet to trade</p>
       </div>
+      <div className="flex flex-wrap justify-end gap-1.5">
+        {QUICK.map((v) => (
+          <button
+            key={v}
+            onClick={() => setAmountStr(Math.max(0.01, (parseFloat(amountStr) || 0) + v).toFixed(2))}
+            className="text-[11px] px-2 py-1 rounded-md border border-border text-muted hover:text-text hover:border-muted transition"
+          >
+            +${v}
+          </button>
+        ))}
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-text">leverage</span>
+          <span className={`text-sm font-semibold ${theme.text}`}>{leverage}x</span>
+        </div>
+        <input
+          type="range"
+          min="1"
+          max="20"
+          value={leverage}
+          onChange={(e) => setLeverage(parseInt(e.target.value))}
+          className="w-full cursor-pointer accent-accent"
+        />
+      </div>
+
+      <div className="flex items-end justify-between border-t border-border pt-3">
+        <div>
+          <div className="text-sm text-text">position size</div>
+          <div className="mt-0.5 text-[11px] text-muted">{contracts.toFixed(4)} contracts</div>
+        </div>
+        <div className={`text-3xl font-bold tracking-tight ${theme.text}`}>
+          ${notional.toFixed(2)}
+        </div>
+      </div>
+
+      <button
+        disabled={amount <= 0}
+        className={`w-full rounded-xl ${theme.bg} px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed`}
+      >
+        {isLong ? 'OPEN LONG' : 'OPEN SHORT'}
+      </button>
+
+      <p className="text-[10px] text-muted text-center">connect wallet to trade</p>
     </div>
   )
 }

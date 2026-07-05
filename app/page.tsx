@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { MARKETS, CATEGORIES } from '@/lib/data'
 import { Category } from '@/lib/types'
+import Sparkline from '@/components/Sparkline'
 
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All')
@@ -13,187 +14,157 @@ export default function Home() {
     : MARKETS.filter(m => m.category === selectedCategory)
 
   return (
-    <div className="min-h-screen bg-dark-bg">
-      <header className="border-b border-dark-border">
-        <div className="mx-auto px-8 py-5 flex items-center justify-between" style={{ maxWidth: '80rem' }}>
-          <div className="flex items-center gap-10">
-            <span className="text-lg font-semibold">PMXT</span>
-            <nav className="flex items-center gap-8 text-sm text-gray-400">
-              <span className="text-white">Markets</span>
-              <a href="#" className="hover:text-gray-300 transition">Docs</a>
-              <a href="#" className="hover:text-gray-300 transition">API</a>
-            </nav>
-          </div>
-          <button className="px-4 py-2 text-sm border border-gray-600 text-gray-300 rounded hover:border-gray-500 transition">
-            Connect Wallet
-          </button>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="md:col-span-2 flex flex-col gap-4">
+        <div>
+          <h1 className="font-mono text-lg text-text">&gt; markets</h1>
+          <p className="font-mono text-xs text-muted mt-1">browse and launch perp markets across categories</p>
         </div>
-      </header>
 
-      <main className="mx-auto px-8 py-10" style={{ maxWidth: '80rem', width: '100%' }}>
-        <div className="grid grid-cols-3 gap-10">
-          <div className="col-span-2 space-y-8">
-            <div>
-              <h1 className="text-3xl font-semibold mb-3">Markets</h1>
-              <p className="text-gray-500">Browse and trade perpetual futures across categories.</p>
-            </div>
+        <div className="flex flex-wrap gap-1.5 font-mono">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat as Category)}
+              className={`text-[11px] px-2.5 py-1 rounded-md border transition ${
+                selectedCategory === cat
+                  ? 'bg-accent/10 border-accent text-accent'
+                  : 'border-border text-muted hover:text-text hover:border-muted'
+              }`}
+            >
+              {cat.toLowerCase()}
+            </button>
+          ))}
+        </div>
 
-            <div className="flex gap-2">
-              {CATEGORIES.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat as Category)}
-                  className={`px-3.5 py-1.5 text-sm rounded transition ${
-                    selectedCategory === cat
-                      ? 'bg-accent-primary text-dark-bg font-medium'
-                      : 'border border-dark-border text-gray-400 hover:text-gray-300'
-                  }`}
+        <div className="border border-border rounded-xl bg-panel overflow-hidden font-mono">
+          <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
+            // {selectedCategory === 'All' ? 'all markets' : selectedCategory.toLowerCase()} ({filteredMarkets.length})
+          </div>
+          <div className="divide-y divide-border/50">
+            {filteredMarkets.map((market) => {
+              const up = market.change24h >= 0
+              return (
+                <Link
+                  key={market.id}
+                  href={`/markets/${market.id}`}
+                  className="flex items-center gap-4 px-4 py-3 text-xs hover:bg-white/[0.03] transition"
                 >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            <div className="border border-dark-border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-dark-border">
-                    <th className="px-6 py-4 text-left font-medium text-gray-500 text-xs uppercase">Market</th>
-                    <th className="px-6 py-4 text-left font-medium text-gray-500 text-xs uppercase">Price</th>
-                    <th className="px-6 py-4 text-left font-medium text-gray-500 text-xs uppercase">24h Vol</th>
-                    <th className="px-6 py-4 text-left font-medium text-gray-500 text-xs uppercase">24h Change</th>
-                    <th className="px-6 py-4 text-left font-medium text-gray-500 text-xs uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMarkets.map((market) => (
-                    <tr key={market.id} className="border-b border-dark-border hover:bg-dark-surface/50 transition cursor-pointer">
-                      <td className="px-6 py-4">
-                        <Link href={`/markets/${market.id}`} className="block">
-                          <div className="font-medium text-white truncate">{market.symbol}</div>
-                          <div className="text-xs text-gray-500 truncate">{market.asset}</div>
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Link href={`/markets/${market.id}`} className="block text-white font-medium">
-                          ${market.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Link href={`/markets/${market.id}`} className="block text-gray-400">
-                          ${formatBigNumber(market.volume24h)}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Link href={`/markets/${market.id}`} className={`block font-medium ${market.change24h >= 0 ? 'text-accent-primary' : 'text-accent-red'}`}>
-                          {market.change24h >= 0 ? '+' : ''}{market.change24h.toFixed(2)}%
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => window.location.href = `/markets/${market.id}`} className="px-4 py-1.5 text-sm rounded bg-accent-primary text-dark-bg font-medium hover:opacity-90 transition">
-                          Trade
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="text-sm text-gray-500">
-              Showing 1-{filteredMarkets.length} of {filteredMarkets.length} markets
-            </div>
-          </div>
-
-          <div className="lg:col-span-1">
-            <div className="border border-dark-border rounded-lg p-8 sticky top-8">
-              <h3 className="text-lg font-semibold mb-2">Create Market</h3>
-              <p className="text-sm text-gray-500 mb-8">
-                Launch a new perpetual market with simple setup.
-              </p>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2.5">Market Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. ACME-PERP"
-                    className="w-full bg-dark-bg border border-dark-border rounded px-3.5 py-2.5 text-sm text-white placeholder-gray-600 focus:border-accent-primary outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2.5">Category</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['Crypto', 'Pre-IPO', 'AI', 'Index'].map(cat => (
-                      <button
-                        key={cat}
-                        className="px-3 py-2 rounded text-sm border border-dark-border text-gray-400 hover:text-gray-300 hover:border-gray-500 transition"
-                      >
-                        {cat}
-                      </button>
-                    ))}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-text text-sm">{market.symbol}</div>
+                    <div className="text-[10px] text-muted truncate mt-0.5">{market.asset.toLowerCase()}</div>
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2.5">Price Source</label>
-                  <select className="w-full bg-dark-bg border border-dark-border rounded px-3.5 py-2.5 text-sm text-white focus:border-accent-primary outline-none transition">
-                    <option>PMXT Source</option>
-                    <option>Custom API</option>
-                    <option>WebSocket</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2.5">Seed Liquidity (USDC)</label>
-                  <input
-                    type="number"
-                    placeholder="10,000"
-                    className="w-full bg-dark-bg border border-dark-border rounded px-3.5 py-2.5 text-sm text-white placeholder-gray-600 focus:border-accent-primary outline-none transition"
-                  />
-                  <div className="text-xs text-gray-500 mt-2">Minimum 1,000 USDC</div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2.5">Creator Fee (%)</label>
-                  <input
-                    type="number"
-                    placeholder="20"
-                    className="w-full bg-dark-bg border border-dark-border rounded px-3.5 py-2.5 text-sm text-white placeholder-gray-600 focus:border-accent-primary outline-none transition"
-                  />
-                </div>
-
-                <button className="w-full bg-accent-primary text-dark-bg py-3 rounded font-semibold hover:opacity-90 transition text-sm">
-                  Review & Launch
-                </button>
-              </div>
-            </div>
+                  <div className="w-24 shrink-0 hidden sm:block opacity-70">
+                    {market.sparkline && <Sparkline data={market.sparkline} isPositive={up} />}
+                  </div>
+                  <div className="text-right shrink-0 w-24">
+                    <div className="text-text">${market.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+                    <div className={`text-[10px] mt-0.5 ${up ? 'text-yes' : 'text-no'}`}>
+                      {up ? '▲' : '▼'} {up ? '+' : ''}{market.change24h.toFixed(2)}%
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 w-20 hidden sm:block">
+                    <div className="text-muted">{fmt(market.volume24h)}</div>
+                    <div className="text-[10px] text-muted mt-0.5">24h vol</div>
+                  </div>
+                  <span className="shrink-0 text-[10px] px-2 py-1 rounded-md border border-accent/40 text-accent">
+                    trade
+                  </span>
+                </Link>
+              )
+            })}
+            {filteredMarkets.length === 0 && (
+              <div className="px-4 py-3 text-[10px] text-muted">no markets in this category</div>
+            )}
           </div>
         </div>
-      </main>
 
-      <footer className="border-t border-dark-border mt-16">
-        <div className="mx-auto px-8 py-6 flex items-center justify-between text-xs text-gray-500" style={{ maxWidth: '80rem' }}>
-          <div className="flex items-center gap-6">
-            <span>v0.01 • Built on PMXT</span>
-            <a href="#" className="hover:text-gray-400 transition">Docs</a>
-            <a href="#" className="hover:text-gray-400 transition">API</a>
-          </div>
-          <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-gray-400 transition">Audited</a>
-            <a href="#" className="hover:text-gray-400 transition">Transparency</a>
-            <span className="flex items-center gap-2">Status <span className="w-1.5 h-1.5 bg-accent-primary rounded-full"></span></span>
-          </div>
+        <div className="font-mono text-[10px] text-muted">
+          showing 1–{filteredMarkets.length} of {filteredMarkets.length} markets
         </div>
-      </footer>
+      </div>
+
+      <div className="md:col-span-1">
+        <CreateMarket />
+      </div>
     </div>
   )
 }
 
-function formatBigNumber(num: number) {
-  if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`
-  if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`
-  if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`
-  return `${num.toFixed(2)}`
+function CreateMarket() {
+  return (
+    <aside className="border border-border rounded-xl bg-panel overflow-hidden font-mono sticky top-20">
+      <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
+        // create market
+      </div>
+      <div className="p-4 flex flex-col gap-4 text-xs">
+        <Field label="market name">
+          <input
+            type="text"
+            placeholder="ACME-PERP"
+            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
+          />
+        </Field>
+
+        <Field label="category">
+          <div className="flex flex-wrap gap-1.5">
+            {['crypto', 'pre-ipo', 'ai', 'index'].map(cat => (
+              <button
+                key={cat}
+                className="text-[11px] px-2.5 py-1 rounded-md border border-border text-muted hover:text-text hover:border-muted transition"
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="price source">
+          <select className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text outline-none focus:border-muted transition">
+            <option>pmxt source</option>
+            <option>custom api</option>
+            <option>websocket</option>
+          </select>
+        </Field>
+
+        <Field label="seed liquidity (usdc)" hint="minimum 1,000 usdc">
+          <input
+            type="number"
+            placeholder="10,000"
+            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
+          />
+        </Field>
+
+        <Field label="creator fee (%)" hint="you earn this share of all trading fees">
+          <input
+            type="number"
+            placeholder="20"
+            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
+          />
+        </Field>
+
+        <button className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none">
+          REVIEW &amp; LAUNCH
+        </button>
+        <p className="text-[10px] text-muted text-center">you&apos;ll confirm in your wallet</p>
+      </div>
+    </aside>
+  )
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[10px] text-muted uppercase tracking-widest">{label}</label>
+      {children}
+      {hint && <span className="text-[10px] text-muted">{hint}</span>}
+    </div>
+  )
+}
+
+function fmt(num: number) {
+  if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}b`
+  if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}m`
+  if (num >= 1e3) return `$${(num / 1e3).toFixed(2)}k`
+  return `$${num.toFixed(2)}`
 }

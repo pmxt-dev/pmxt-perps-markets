@@ -1,11 +1,16 @@
 import { Market } from './types'
 
-const generateSparkline = (basePrice: number, volatility: number, points: number = 24) => {
+// ponytail: seeded LCG, not Math.random — server/client must generate identical data or hydration breaks
+const generateSparkline = (basePrice: number, volatility: number, points: number = 48) => {
+  let seed = Math.floor(basePrice * 1000) % 2147483647 || 42
+  const rand = () => {
+    seed = (seed * 48271) % 2147483647
+    return seed / 2147483647
+  }
   const data = []
   let price = basePrice
   for (let i = 0; i < points; i++) {
-    const change = (Math.random() - 0.5) * volatility
-    price = price * (1 + change)
+    price = price * (1 + (rand() - 0.5) * volatility)
     data.push(price)
   }
   return data
