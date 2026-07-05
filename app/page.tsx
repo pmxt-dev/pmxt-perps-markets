@@ -140,6 +140,14 @@ function CreateMarket() {
           />
         </Field>
 
+        <Field label="description">
+          <textarea
+            rows={3}
+            placeholder="what does this market track, and where does its price come from?"
+            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition resize-none"
+          />
+        </Field>
+
         <Field label="category">
           <div className="flex flex-wrap gap-1.5">
             {['crypto', 'pre-ipo', 'ai', 'index'].map(cat => (

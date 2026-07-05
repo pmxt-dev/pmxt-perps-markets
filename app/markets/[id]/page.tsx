@@ -125,6 +125,11 @@ export default function MarketDetail() {
               <span>oi {fmt(market.qi)}</span>
               <span>onchain · usdc</span>
             </div>
+
+            <div className="px-4 py-3 border-t border-border">
+              <div className="text-[10px] text-muted uppercase tracking-widest mb-1.5">// about</div>
+              <p className="text-xs text-muted leading-relaxed">{market.description}</p>
+            </div>
           </div>
 
           <div className="border border-border rounded-xl bg-panel overflow-hidden mt-6">

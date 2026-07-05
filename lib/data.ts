@@ -33,6 +33,8 @@ export const MARKETS: Market[] = [
     qi: 832.1e6,
     action: 'Trade',
     sparkline: generateSparkline(112458.70, 0.015),
+    description:
+      'perpetual future on bitcoin. oracle price streams from yfinance (BTC-USD); funding keeps mark pinned to spot. long or short with usdc collateral, no expiry.',
   },
   {
     id: 'eth-perp',
@@ -48,6 +50,8 @@ export const MARKETS: Market[] = [
     qi: 512.37e6,
     action: 'Trade',
     sparkline: generateSparkline(3842.16, 0.028),
+    description:
+      'perpetual future on ethereum. oracle price streams from yfinance (ETH-USD); funding keeps mark pinned to spot. long or short with usdc collateral, no expiry.',
   },
   {
     id: 'pmxt-perp',
@@ -62,6 +66,8 @@ export const MARKETS: Market[] = [
     qi: 89.24e6,
     action: 'Trade',
     sparkline: generateSparkline(0.4231, 0.032),
+    description:
+      'synthetic pre-ipo exposure to pmxt. no external price feed exists — this market’s own orderbook is the oracle, so the price is whatever traders agree it is. trade at your own risk.',
   },
   {
     id: 'newco-perp',
@@ -76,6 +82,8 @@ export const MARKETS: Market[] = [
     qi: 12.33e6,
     action: 'Trade',
     sparkline: generateSparkline(1.036, 0.021),
+    description:
+      'synthetic pre-ipo exposure to newco. self-oracled: the orderbook sets the price, with no external feed to arbitrage against. thin liquidity, wide moves — trade at your own risk.',
   },
   {
     id: 'ai16z-perp',
@@ -91,6 +99,8 @@ export const MARKETS: Market[] = [
     qi: 45.11e6,
     action: 'Trade',
     sparkline: generateSparkline(0.1872, 0.069),
+    description:
+      'perpetual future on the ai16z token. oracle price streams from yfinance (AI16Z-USD). high volatility — expect fast funding swings and size accordingly.',
   },
   {
     id: 'doge-perp',
@@ -106,6 +116,8 @@ export const MARKETS: Market[] = [
     qi: 31.22e6,
     action: 'Trade',
     sparkline: generateSparkline(0.1587, 0.017),
+    description:
+      'perpetual future on dogecoin. oracle price streams from yfinance (DOGE-USD); funding keeps mark pinned to spot. the community classic, tradable long or short.',
   },
   {
     id: 'ai-index-perp',
@@ -121,6 +133,8 @@ export const MARKETS: Market[] = [
     qi: 15.67e6,
     action: 'Trade',
     sparkline: generateSparkline(1248.36, 0.009),
+    description:
+      'perpetual future on a basket index of large-cap ai names. oracle tracks the composite index level (^AIDX) via yfinance — one position for broad ai exposure instead of picking single tickers.',
   },
 ]
 

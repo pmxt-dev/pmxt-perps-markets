@@ -12,6 +12,7 @@ export interface Market {
   action: string
   sourceType: 'yfinance' | 'orderbook'
   sourceTicker?: string
+  description: string
 }
 
 export type Category = "All" | "Crypto" | "Pre-IPO" | "AI" | "Community" | "Indices"
