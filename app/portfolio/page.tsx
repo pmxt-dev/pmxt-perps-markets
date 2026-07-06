@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { Transaction } from '@solana/web3.js'
 import { useTradingWallet } from '@/lib/useTradingWallet'
 import { MARKETS } from '@/lib/data'
 import { fmtPrice } from '@/lib/format'
@@ -18,6 +19,14 @@ interface AccountInfo {
   account: { address: string; usdcUi: number; positions: Position[] } | null
 }
 
+interface OpenOrder {
+  symbol: string
+  orderId: string
+  side: 'buy' | 'sell'
+  price: number
+  size: number
+}
+
 interface Fill {
   symbol: string
   side: 'buy' | 'sell'
@@ -28,67 +37,87 @@ interface Fill {
   seqNum: number
 }
 
-// chainSymbol → market page id, so symbols link back to their market
+type Tab = 'positions' | 'orders' | 'history'
+
 const MARKET_ID_BY_SYMBOL = new Map(
   MARKETS.filter(m => m.chainSymbol).map(m => [m.chainSymbol!, m.id]),
 )
 
+const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+const bytesToB64 = (bytes: Uint8Array) => {
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(s)
+}
+
 export default function Portfolio() {
-  const { publicKey, connected, isDemo, connect } = useTradingWallet()
+  const { publicKey, connected, isDemo, connect, signTransaction } = useTradingWallet()
   const [info, setInfo] = useState<AccountInfo | null>(null)
+  const [orders, setOrders] = useState<OpenOrder[] | null>(null)
   const [fills, setFills] = useState<Fill[] | null>(null)
   const [marks, setMarks] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('positions')
+  const [cancelling, setCancelling] = useState<string | null>(null)
 
   const load = useCallback(() => {
-    if (!publicKey) {
-      setInfo(null)
-      setFills(null)
-      return
-    }
+    if (!publicKey) { setInfo(null); setOrders(null); setFills(null); return }
     const owner = publicKey.toBase58()
     fetch(`/api/trade/account?owner=${encodeURIComponent(owner)}`)
-      .then(async r => {
-        const d = await r.json()
-        if (r.ok) { setInfo(d); setError(null) }
-        else setError(typeof d.error === 'string' ? d.error : 'account load failed')
-      })
+      .then(async r => { const d = await r.json(); if (r.ok) { setInfo(d); setError(null) } else setError(typeof d.error === 'string' ? d.error : 'account load failed') })
       .catch(e => setError(e instanceof Error ? e.message : 'account load failed'))
+    fetch(`/api/trade/orders?owner=${encodeURIComponent(owner)}`)
+      .then(async r => { const d = await r.json(); if (r.ok && Array.isArray(d.orders)) setOrders(d.orders) })
+      .catch(() => {})
     fetch(`/api/trade/fills?owner=${encodeURIComponent(owner)}`)
-      .then(async r => {
-        const d = await r.json()
-        if (r.ok && Array.isArray(d.fills)) setFills(d.fills)
-      })
+      .then(async r => { const d = await r.json(); if (r.ok && Array.isArray(d.fills)) setFills(d.fills) })
       .catch(() => {})
     fetch('/api/chain-markets')
-      .then(async r => {
-        const d = await r.json()
-        if (r.ok && Array.isArray(d.markets)) {
-          setMarks(Object.fromEntries(
-            d.markets.map((m: { name: string; oraclePrice: number }) => [m.name, m.oraclePrice]),
-          ))
-        }
-      })
+      .then(async r => { const d = await r.json(); if (r.ok && Array.isArray(d.markets)) setMarks(Object.fromEntries(d.markets.map((m: { name: string; markPrice: number }) => [m.name, m.markPrice]))) })
       .catch(() => {})
   }, [publicKey])
 
   useEffect(() => {
     load()
-    const iv = setInterval(load, 15_000)
+    const iv = setInterval(load, 12_000)
     window.addEventListener('pmxt:trade', load)
     return () => { clearInterval(iv); window.removeEventListener('pmxt:trade', load) }
   }, [load])
+
+  const cancelOrder = async (o: OpenOrder) => {
+    if (!publicKey || !signTransaction) return
+    setError(null)
+    setCancelling(o.orderId)
+    try {
+      const res = await fetch('/api/trade/cancel', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner: publicKey.toBase58(), symbol: o.symbol, orderId: o.orderId }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(typeof d.error === 'string' ? d.error : 'cancel failed')
+      const signed = await signTransaction(Transaction.from(b64ToBytes(d.tx)))
+      const sub = await fetch('/api/trade/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
+      })
+      const sd = await sub.json()
+      if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+      load()
+      window.dispatchEvent(new Event('pmxt:trade'))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'cancel failed')
+    } finally {
+      setCancelling(null)
+    }
+  }
 
   if (!connected) {
     return (
       <div className="max-w-lg font-mono">
         <h1 className="text-lg text-text">&gt; portfolio</h1>
         <div className="mt-4 border border-border rounded-xl bg-panel p-6 text-center">
-          <p className="text-xs text-muted">connect a wallet to see your balance, positions, and trade history</p>
-          <button
-            onClick={connect}
-            className="mt-4 rounded-xl bg-accent/90 hover:bg-accent px-6 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none"
-          >
+          <p className="text-xs text-muted">connect a wallet to see your balance, positions, orders, and history</p>
+          <button onClick={connect} className="mt-4 rounded-xl bg-accent/90 hover:bg-accent px-6 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none">
             {isDemo ? 'START DEMO WALLET' : 'CONNECT WALLET'}
           </button>
         </div>
@@ -99,6 +128,12 @@ export default function Portfolio() {
   const positions = info?.account?.positions.filter(p => Math.abs(p.baseUi) > 0) ?? []
   const tradable = info?.account?.usdcUi ?? 0
   const totalPnl = positions.reduce((s, p) => s + p.unsettledPnlUi, 0)
+
+  const TABS: { key: Tab; label: string; count: number | null }[] = [
+    { key: 'positions', label: 'positions', count: positions.length },
+    { key: 'orders', label: 'open orders', count: orders?.length ?? null },
+    { key: 'history', label: 'history', count: fills?.length ?? null },
+  ]
 
   return (
     <div className="flex flex-col gap-6 font-mono">
@@ -128,89 +163,120 @@ export default function Portfolio() {
       </div>
 
       <div className="border border-border rounded-xl bg-panel overflow-hidden">
-        <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
-          // positions ({positions.length})
+        <div className="flex border-b border-border">
+          {TABS.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-4 py-3 text-xs uppercase tracking-widest transition border-b-2 -mb-px ${
+                tab === t.key ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text'
+              }`}
+            >
+              {t.label}{t.count !== null ? ` (${t.count})` : ''}
+            </button>
+          ))}
         </div>
-        {positions.length === 0 ? (
-          <div className="px-4 py-4 text-[11px] text-muted">
-            no open positions — <Link href="/" className="text-accent hover:underline">find a market</Link>
-          </div>
-        ) : (
-          <div className="divide-y divide-border/50 text-xs">
-            <div className="flex px-4 py-2 text-[10px] text-muted uppercase tracking-widest">
-              <span className="flex-1">market</span>
-              <span className="w-24 text-right">size</span>
-              <span className="w-28 text-right hidden sm:block">mark</span>
-              <span className="w-28 text-right hidden sm:block">notional</span>
-              <span className="w-28 text-right">unsettled pnl</span>
-            </div>
-            {positions.map(p => {
-              const mark = marks[p.symbol]
-              const id = MARKET_ID_BY_SYMBOL.get(p.symbol)
-              const row = (
-                <>
-                  <span className="flex-1 text-text">{p.symbol}</span>
-                  <span className={`w-24 text-right ${p.baseUi > 0 ? 'text-yes' : 'text-no'}`}>
-                    {p.baseUi > 0 ? '+' : ''}{p.baseUi}
-                  </span>
-                  <span className="w-28 text-right text-muted hidden sm:block">
-                    {mark !== undefined ? `$${fmtPrice(mark)}` : '—'}
-                  </span>
-                  <span className="w-28 text-right text-text hidden sm:block">
-                    {mark !== undefined ? `$${fmtPrice(Math.abs(p.baseUi) * mark)}` : '—'}
-                  </span>
-                  <span className={`w-28 text-right ${p.unsettledPnlUi >= 0 ? 'text-yes' : 'text-no'}`}>
-                    {p.unsettledPnlUi >= 0 ? '+' : ''}{p.unsettledPnlUi.toFixed(2)}
-                  </span>
-                </>
-              )
-              return id ? (
-                <Link key={p.symbol} href={`/markets/${id}`} className="flex px-4 py-2.5 hover:bg-white/[0.03] transition">
-                  {row}
-                </Link>
-              ) : (
-                <div key={p.symbol} className="flex px-4 py-2.5">{row}</div>
-              )
-            })}
-          </div>
-        )}
-      </div>
 
-      <div className="border border-border rounded-xl bg-panel overflow-hidden">
-        <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
-          // trade history{fills ? ` (${fills.length})` : ''}
-        </div>
-        {!fills ? (
-          <div className="px-4 py-4 text-[11px] text-muted">loading…</div>
-        ) : fills.length === 0 ? (
-          <div className="px-4 py-4 text-[11px] text-muted">no fills yet — your executed trades will show up here</div>
-        ) : (
-          <div className="divide-y divide-border/50 text-xs">
-            <div className="flex px-4 py-2 text-[10px] text-muted uppercase tracking-widest">
-              <span className="w-36">time</span>
-              <span className="flex-1">market</span>
-              <span className="w-14">side</span>
-              <span className="w-24 text-right">size</span>
-              <span className="w-28 text-right">price</span>
-              <span className="w-28 text-right hidden sm:block">notional</span>
-              <span className="w-16 text-right hidden sm:block">role</span>
+        {tab === 'positions' && (
+          positions.length === 0 ? (
+            <div className="px-4 py-4 text-[11px] text-muted">
+              no open positions — <Link href="/" className="text-accent hover:underline">find a market</Link>
             </div>
-            {fills.map(f => (
-              <div key={`${f.symbol}-${f.seqNum}`} className="flex px-4 py-2.5">
-                <span className="w-36 text-muted">
-                  {new Date(f.time).toLocaleString('en-US', {
-                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-                  }).toLowerCase()}
-                </span>
-                <span className="flex-1 text-text">{f.symbol}</span>
-                <span className={`w-14 ${f.side === 'buy' ? 'text-yes' : 'text-no'}`}>{f.side}</span>
-                <span className="w-24 text-right text-text">{f.size}</span>
-                <span className="w-28 text-right text-text">${fmtPrice(f.price)}</span>
-                <span className="w-28 text-right text-muted hidden sm:block">${fmtPrice(f.size * f.price)}</span>
-                <span className="w-16 text-right text-muted hidden sm:block">{f.role}</span>
+          ) : (
+            <div className="divide-y divide-border/50 text-xs">
+              <div className="flex px-4 py-2 text-[10px] text-muted uppercase tracking-widest">
+                <span className="flex-1">market</span>
+                <span className="w-24 text-right">size</span>
+                <span className="w-28 text-right hidden sm:block">mark</span>
+                <span className="w-28 text-right hidden sm:block">notional</span>
+                <span className="w-28 text-right">unsettled pnl</span>
               </div>
-            ))}
-          </div>
+              {positions.map(p => {
+                const mark = marks[p.symbol]
+                const id = MARKET_ID_BY_SYMBOL.get(p.symbol)
+                const row = (
+                  <>
+                    <span className="flex-1 text-text">{p.symbol}</span>
+                    <span className={`w-24 text-right ${p.baseUi > 0 ? 'text-yes' : 'text-no'}`}>{p.baseUi > 0 ? '+' : ''}{p.baseUi}</span>
+                    <span className="w-28 text-right text-muted hidden sm:block">{mark !== undefined ? `$${fmtPrice(mark)}` : '—'}</span>
+                    <span className="w-28 text-right text-text hidden sm:block">{mark !== undefined ? `$${fmtPrice(Math.abs(p.baseUi) * mark)}` : '—'}</span>
+                    <span className={`w-28 text-right ${p.unsettledPnlUi >= 0 ? 'text-yes' : 'text-no'}`}>{p.unsettledPnlUi >= 0 ? '+' : ''}{p.unsettledPnlUi.toFixed(2)}</span>
+                  </>
+                )
+                return id
+                  ? <Link key={p.symbol} href={`/markets/${id}`} className="flex px-4 py-2.5 hover:bg-white/[0.03] transition">{row}</Link>
+                  : <div key={p.symbol} className="flex px-4 py-2.5">{row}</div>
+              })}
+            </div>
+          )
+        )}
+
+        {tab === 'orders' && (
+          !orders ? (
+            <div className="px-4 py-4 text-[11px] text-muted">loading…</div>
+          ) : orders.length === 0 ? (
+            <div className="px-4 py-4 text-[11px] text-muted">no open orders — limit orders you place will show up here</div>
+          ) : (
+            <div className="divide-y divide-border/50 text-xs">
+              <div className="flex px-4 py-2 text-[10px] text-muted uppercase tracking-widest">
+                <span className="flex-1">market</span>
+                <span className="w-14">side</span>
+                <span className="w-24 text-right">size</span>
+                <span className="w-28 text-right">price</span>
+                <span className="w-28 text-right hidden sm:block">value</span>
+                <span className="w-24 text-right"></span>
+              </div>
+              {orders.map(o => (
+                <div key={`${o.symbol}-${o.orderId}`} className="flex items-center px-4 py-2.5">
+                  <span className="flex-1 text-text">{o.symbol}</span>
+                  <span className={`w-14 ${o.side === 'buy' ? 'text-yes' : 'text-no'}`}>{o.side}</span>
+                  <span className="w-24 text-right text-text">{o.size}</span>
+                  <span className="w-28 text-right text-text">${fmtPrice(o.price)}</span>
+                  <span className="w-28 text-right text-muted hidden sm:block">${fmtPrice(o.size * o.price)}</span>
+                  <span className="w-24 text-right">
+                    <button
+                      onClick={() => cancelOrder(o)}
+                      disabled={cancelling !== null}
+                      className="text-[11px] px-2.5 py-1 rounded-md border border-border text-muted hover:text-no hover:border-no/40 transition disabled:opacity-40"
+                    >
+                      {cancelling === o.orderId ? '…' : 'cancel'}
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {tab === 'history' && (
+          !fills ? (
+            <div className="px-4 py-4 text-[11px] text-muted">loading…</div>
+          ) : fills.length === 0 ? (
+            <div className="px-4 py-4 text-[11px] text-muted">no fills yet — your executed trades will show up here</div>
+          ) : (
+            <div className="divide-y divide-border/50 text-xs">
+              <div className="flex px-4 py-2 text-[10px] text-muted uppercase tracking-widest">
+                <span className="w-36">time</span>
+                <span className="flex-1">market</span>
+                <span className="w-14">side</span>
+                <span className="w-24 text-right">size</span>
+                <span className="w-28 text-right">price</span>
+                <span className="w-28 text-right hidden sm:block">notional</span>
+                <span className="w-16 text-right hidden sm:block">role</span>
+              </div>
+              {fills.map(f => (
+                <div key={`${f.symbol}-${f.seqNum}`} className="flex px-4 py-2.5">
+                  <span className="w-36 text-muted">{new Date(f.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).toLowerCase()}</span>
+                  <span className="flex-1 text-text">{f.symbol}</span>
+                  <span className={`w-14 ${f.side === 'buy' ? 'text-yes' : 'text-no'}`}>{f.side}</span>
+                  <span className="w-24 text-right text-text">{f.size}</span>
+                  <span className="w-28 text-right text-text">${fmtPrice(f.price)}</span>
+                  <span className="w-28 text-right text-muted hidden sm:block">${fmtPrice(f.size * f.price)}</span>
+                  <span className="w-16 text-right text-muted hidden sm:block">{f.role}</span>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>

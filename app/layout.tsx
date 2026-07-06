@@ -24,7 +24,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 pmxt<span className="text-accent">·</span>perps
               </Link>
               <nav className="font-mono text-xs flex items-center gap-4">
-                <Link href="/" className="text-muted hover:text-text transition">markets</Link>
                 <Link href="/portfolio" className="text-muted hover:text-text transition">portfolio</Link>
               </nav>
               <div className="flex-1" />

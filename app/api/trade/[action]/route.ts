@@ -10,6 +10,7 @@ const POST_ACTIONS: Record<string, string> = {
   setup: '/tx/setup',
   order: '/tx/order',
   submit: '/tx/submit',
+  cancel: '/tx/cancel',
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ action: string }> }) {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ act
   }
 }
 
-const GET_ACTIONS = ['account', 'fills']
+const GET_ACTIONS = ['account', 'fills', 'orders']
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ action: string }> }) {
   const { action } = await params
