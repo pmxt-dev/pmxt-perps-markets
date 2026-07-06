@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { MARKETS, CATEGORIES } from '@/lib/data'
 import { fmtPrice } from '@/lib/format'
-import { Category } from '@/lib/types'
+import { Category, Market } from '@/lib/types'
+import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
 import Sparkline from '@/components/Sparkline'
 
 interface LiveQuote {
@@ -16,6 +17,7 @@ interface LiveQuote {
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All')
   const [live, setLive] = useState<Record<string, LiveQuote>>({})
+  const [extra, setExtra] = useState<Market[]>([])
   const [liquidity, setLiquidity] = useState<Record<string, number>>({})
   const [chainError, setChainError] = useState<string | null>(null)
 
@@ -94,6 +96,14 @@ export default function Home() {
           setLiquidity(d.liquidity)
         })
         .catch(() => {})
+      // full catalog — surfaces markets deployed at runtime
+      fetch('/api/catalog')
+        .then(async r => {
+          const d = await r.json()
+          if (cancelled || !r.ok || !Array.isArray(d.markets)) return
+          setExtra((d.markets as CatalogEntry[]).map(catalogToMarket))
+        })
+        .catch(() => {})
     }
     loadAll()
     const iv = setInterval(loadAll, 8_000)
@@ -103,9 +113,12 @@ export default function Home() {
     return () => { cancelled = true; clearInterval(iv); window.removeEventListener('pmxt:trade', onTrade) }
   }, [])
 
+  // static markets + any deployed at runtime (from the chain catalog)
+  const staticSymbols = new Set(MARKETS.map(m => m.chainSymbol).filter(Boolean))
+  const allMarkets = [...MARKETS, ...extra.filter(m => !staticSymbols.has(m.chainSymbol))]
   const filteredMarkets = selectedCategory === 'All'
-    ? MARKETS
-    : MARKETS.filter(m => m.category === selectedCategory)
+    ? allMarkets
+    : allMarkets.filter(m => m.category === selectedCategory)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -219,9 +232,52 @@ function CreateMarket() {
   const [asset, setAsset] = useState<YfAsset | null>(null)
   const [searching, setSearching] = useState(false)
   const [seedStr, setSeedStr] = useState('')
+  const [nameStr, setNameStr] = useState('')
+  const [descStr, setDescStr] = useState('')
+  const [listingPriceStr, setListingPriceStr] = useState('')
+  const [deploying, setDeploying] = useState<string | null>(null)
+  const [deployError, setDeployError] = useState<string | null>(null)
+  const [deployed, setDeployed] = useState<string | null>(null)
 
   const seed = parseFloat(seedStr) || 0
   const seedTooLow = seedStr !== '' && seed < 100
+  const isSelf = priceSource === 'orderbook'
+  const listingPrice = parseFloat(listingPriceStr) || 0
+
+  const canDeploy =
+    nameStr.trim() !== '' && !seedTooLow && seed >= 100 &&
+    (isSelf ? listingPrice > 0 : asset !== null) && deploying === null
+
+  const onDeploy = async () => {
+    setDeployError(null)
+    setDeployed(null)
+    try {
+      setDeploying('deploying market on-chain…')
+      const res = await fetch('/api/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nameStr,
+          description: descStr,
+          category: category === 'other' ? customCategory : category,
+          priceSource,
+          sourceTicker: isSelf ? undefined : asset?.symbol,
+          initialPrice: isSelf ? listingPrice : undefined,
+          seedUsdc: seed,
+          thumbnail: thumbnailUrl || undefined,
+        }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(typeof d.error === 'string' ? d.error : 'deploy failed')
+      setDeployed(d.name)
+      setNameStr(''); setDescStr(''); setSeedStr(''); setListingPriceStr(''); setAsset(null)
+      window.dispatchEvent(new Event('pmxt:trade')) // triggers list refetch
+    } catch (e: unknown) {
+      setDeployError(e instanceof Error ? e.message : 'deploy failed')
+    } finally {
+      setDeploying(null)
+    }
+  }
 
   // free-form fee inputs: never rewrite what the user typed, just flag out-of-bounds
   const feeBps = /^\d+$/.test(feeBpsStr.trim()) ? parseInt(feeBpsStr.trim(), 10) : NaN
@@ -255,6 +311,8 @@ function CreateMarket() {
         <Field label="market name">
           <input
             type="text"
+            value={nameStr}
+            onChange={(e) => setNameStr(e.target.value)}
             placeholder="ACME-PERP"
             className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
           />
@@ -263,6 +321,8 @@ function CreateMarket() {
         <Field label="description">
           <textarea
             rows={3}
+            value={descStr}
+            onChange={(e) => setDescStr(e.target.value)}
             placeholder="what does this market track, and where does its price come from?"
             className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition resize-none"
           />
@@ -369,6 +429,20 @@ function CreateMarket() {
           </Field>
         )}
 
+        {isSelf && (
+          <Field label="listing price (usd)" hint="the price this market opens at — the seed book is placed around it">
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={listingPriceStr}
+              onChange={(e) => setListingPriceStr(e.target.value)}
+              placeholder="1.00"
+              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
+            />
+          </Field>
+        )}
+
         <Field label="seed liquidity (usdc)">
           <input
             type="number"
@@ -441,12 +515,17 @@ function CreateMarket() {
         </Field>
 
         <button
-          disabled={seedTooLow || seed === 0 || feeBpsError || creatorFeeError || feesIncomplete}
+          onClick={onDeploy}
+          disabled={!canDeploy || feeBpsError || creatorFeeError || feesIncomplete}
           className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed"
         >
-          REVIEW &amp; LAUNCH
+          {deploying ?? 'LAUNCH MARKET'}
         </button>
-        <p className="text-[10px] text-muted text-center">you&apos;ll confirm in your wallet</p>
+        {deployError && <p className="text-[10px] text-no text-center">✗ {deployError}</p>}
+        {deployed && <p className="text-[10px] text-yes text-center">✓ {deployed} is live — it&apos;ll appear in the list</p>}
+        {!deployError && !deployed && (
+          <p className="text-[10px] text-muted text-center">deploys on-chain, seeds the book, and lists it live</p>
+        )}
       </div>
     </aside>
   )

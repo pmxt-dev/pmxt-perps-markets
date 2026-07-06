@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MARKETS } from '@/lib/data'
+import { Market } from '@/lib/types'
+import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
 import { fmtPrice } from '@/lib/format'
 import Sparkline from '@/components/Sparkline'
 import BuySell from '@/components/BuySell'
@@ -31,7 +33,27 @@ interface ChainPoint {
 export default function MarketDetail() {
   const params = useParams()
   const id = params?.id as string
-  const market = MARKETS.find(m => m.id === id)
+  const staticMarket = MARKETS.find(m => m.id === id)
+  // markets deployed at runtime aren't in the static catalog — resolve from chain
+  const [catalogMarket, setCatalogMarket] = useState<Market | null>(null)
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  useEffect(() => {
+    if (staticMarket) { setCatalogLoading(false); return }
+    let cancelled = false
+    fetch('/api/catalog')
+      .then(async r => {
+        const d = await r.json()
+        if (cancelled) return
+        if (r.ok && Array.isArray(d.markets)) {
+          const e = (d.markets as CatalogEntry[]).find(x => x.name.toLowerCase() === id)
+          if (e) setCatalogMarket(catalogToMarket(e))
+        }
+        setCatalogLoading(false)
+      })
+      .catch(() => { if (!cancelled) setCatalogLoading(false) })
+    return () => { cancelled = true }
+  }, [staticMarket, id])
+  const market = staticMarket ?? catalogMarket
   const [liveOracle, setLiveOracle] = useState<number | null>(null)
   const [liveMark, setLiveMark] = useState<number | null>(null)
   const [tf, setTf] = useState<Timeframe>('7d')
@@ -126,7 +148,9 @@ export default function MarketDetail() {
   if (!market) {
     return (
       <div className="font-mono text-sm">
-        <div className="text-no">✗ market not found</div>
+        <div className={catalogLoading ? 'text-muted' : 'text-no'}>
+          {catalogLoading ? 'loading market…' : '✗ market not found'}
+        </div>
         <Link href="/" className="text-accent hover:underline text-xs mt-2 inline-block">
           &lt; back to markets
         </Link>
