@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Transaction } from '@solana/web3.js'
 import { useTradingWallet } from '@/lib/useTradingWallet'
-import { MARKETS } from '@/lib/data'
 import { fmtPrice, fmtSize } from '@/lib/format'
 
 interface Position {
@@ -46,10 +45,6 @@ interface MarketFees {
 }
 
 type Tab = 'positions' | 'orders' | 'history' | 'earnings'
-
-const MARKET_ID_BY_SYMBOL = new Map(
-  MARKETS.filter(m => m.chainSymbol).map(m => [m.chainSymbol!, m.id]),
-)
 
 const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), c => c.charCodeAt(0))
 const bytesToB64 = (bytes: Uint8Array) => {
@@ -238,7 +233,7 @@ export default function Portfolio() {
               </div>
               {positions.map(p => {
                 const mark = marks[p.symbol]
-                const id = MARKET_ID_BY_SYMBOL.get(p.symbol)
+                const id = p.symbol.toLowerCase() // market page id = symbol lowercased
                 const row = (
                   <>
                     <span className="flex-1 text-text">{p.symbol}</span>
