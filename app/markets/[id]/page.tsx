@@ -375,8 +375,8 @@ function CreatorFees({ chainSymbol }: { chainSymbol: string }) {
     return () => clearInterval(iv)
   }, [chainSymbol])
 
-  if (!info || !info.creator) return null
-  const isCreator = publicKey?.toBase58() === info.creator
+  // only the market's creator sees the fee-claim card
+  if (!info || !info.creator || publicKey?.toBase58() !== info.creator) return null
   const claimable = info.creatorClaimableUsd
 
   const claim = async () => {
@@ -403,7 +403,7 @@ function CreatorFees({ chainSymbol }: { chainSymbol: string }) {
   return (
     <div className="border border-border rounded-xl bg-panel overflow-hidden font-mono">
       <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
-        // creator fees{isCreator ? ' · your market' : ''}
+        // creator fees · your market
       </div>
       <div className="p-4 flex flex-col gap-3 text-xs">
         <div className="flex justify-between">
