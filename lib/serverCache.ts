@@ -1,58 +1,25 @@
-// Shared server-side cache. There's one Next.js server process, so every user
-// hits the same entries — the first request in each TTL window pays the upstream
-// cost, everyone else is served from memory. Stale-while-revalidate: once an
-// entry exists, requests never block on upstream again; a stale hit is returned
-// instantly while a single background refresh runs.
-interface Entry {
-  at: number
-  body: unknown
-  status: number
-}
-
-const store = new Map<string, Entry>()
-const inflight = new Map<string, Promise<Entry>>()
-
+// Shared caching is done at the CDN edge via Cache-Control headers (see
+// cacheHeaders) — that layer is coherent and shared across all users. We do NOT
+// keep an in-process cache: on serverless (Vercel) each instance has its own
+// memory, so a process-level cache isn't shared, diverges between instances, and
+// serves stale data across a chain reset (this caused "ghost markets" flickering
+// in and out as requests hit different instances). So `cached` just runs the
+// producer; the CDN + stale-while-revalidate handle sharing and slow upstreams.
 export interface Produced {
   body: unknown
   status: number
 }
 
 export async function cached(
-  key: string,
-  ttlMs: number,
+  _key: string,
+  _ttlMs: number,
   produce: () => Promise<Produced>,
 ): Promise<Produced> {
-  const hit = store.get(key)
-  const fresh = hit && Date.now() - hit.at < ttlMs
-
-  const refresh = (): Promise<Entry> => {
-    const existing = inflight.get(key)
-    if (existing) return existing
-    const p = produce()
-      .then(({ body, status }) => {
-        const entry: Entry = { at: Date.now(), body, status }
-        if (status < 500) store.set(key, entry) // don't cache upstream failures
-        inflight.delete(key)
-        return entry
-      })
-      .catch((err) => {
-        inflight.delete(key)
-        throw err
-      })
-    inflight.set(key, p)
-    return p
-  }
-
-  if (fresh) return hit!
-  if (hit) {
-    refresh().catch(() => {}) // serve stale now, refresh in the background
-    return hit
-  }
-  return refresh() // cold — wait for the first fetch
+  return produce()
 }
 
-// s-maxage lets a CDN (e.g. Vercel edge) share the response across users in prod;
-// stale-while-revalidate serves instantly while the edge refreshes.
+// s-maxage lets the CDN (Vercel edge) share ONE coherent cached response across
+// users; stale-while-revalidate serves it instantly while the edge refreshes.
 export function cacheHeaders(sMaxageSec: number): Record<string, string> {
   return { 'Cache-Control': `public, s-maxage=${sMaxageSec}, stale-while-revalidate=${sMaxageSec * 6}` }
 }
