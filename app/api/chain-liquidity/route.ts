@@ -7,9 +7,9 @@ import { cached, cacheHeaders } from '@/lib/serverCache'
 const CHAIN_MARKETS_API = process.env.CHAIN_MARKETS_API ?? 'http://65.109.107.152:8790'
 
 export async function GET() {
-  const { body, status } = await cached('chain-liquidity', 5_000, async () => {
+  const { body, status } = await cached('chain-liquidity', 15_000, async () => {
     try {
-      const res = await fetch(`${CHAIN_MARKETS_API}/v0/markets`, { signal: AbortSignal.timeout(10_000) })
+      const res = await fetch(`${CHAIN_MARKETS_API}/v0/markets`, { signal: AbortSignal.timeout(22_000) })
       const data = await res.json()
       if (!res.ok || !Array.isArray(data)) return { body: { liquidity: {} }, status: 200 }
       const liquidity = Object.fromEntries(

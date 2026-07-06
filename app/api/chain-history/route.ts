@@ -12,11 +12,11 @@ export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get('symbol')?.trim()
   if (!symbol) return NextResponse.json({ error: 'symbol required' }, { status: 400 })
 
-  const { body, status } = await cached(`chain-history:${symbol}`, 10_000, async () => {
+  const { body, status } = await cached(`chain-history:${symbol}`, 30_000, async () => {
     try {
       const res = await fetch(
         `${CHAIN_MARKETS_API}/v0/markets/${encodeURIComponent(symbol)}/candles?interval=1m&limit=500`,
-        { signal: AbortSignal.timeout(10_000) },
+        { signal: AbortSignal.timeout(22_000) },
       )
       const data = await res.json()
       if (!res.ok || !Array.isArray(data)) {

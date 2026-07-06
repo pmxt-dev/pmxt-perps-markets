@@ -16,9 +16,9 @@ export interface ChainMarket {
 }
 
 export async function GET() {
-  const { body, status } = await cached('chain-markets', 4_000, async () => {
+  const { body, status } = await cached('chain-markets', 12_000, async () => {
     try {
-      const res = await fetch(`${CHAIN_MARKETS_API}/v0/markets`, { signal: AbortSignal.timeout(10_000) })
+      const res = await fetch(`${CHAIN_MARKETS_API}/v0/markets`, { signal: AbortSignal.timeout(22_000) })
       if (!res.ok) return { body: { error: `chain feed returned ${res.status}` }, status: 502 }
       const data = await res.json()
       if (!Array.isArray(data)) return { body: { error: 'chain feed returned malformed payload' }, status: 502 }
