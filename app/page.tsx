@@ -437,7 +437,7 @@ function CreateMarket() {
         </Field>
 
         <Field
-          label="price source"
+          label="oracle source"
           hint={priceSource === 'orderbook' ? 'no external oracle — the market’s own orderbook is the price. for pre-ipo and anything without a feed. trade at your own risk.' : undefined}
         >
           <select
