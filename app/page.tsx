@@ -8,6 +8,14 @@ import { Category, Market } from '@/lib/types'
 import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
 import { useTradingWallet } from '@/lib/useTradingWallet'
 import Sparkline from '@/components/Sparkline'
+import { Transaction } from '@solana/web3.js'
+
+const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+const bytesToB64 = (bytes: Uint8Array) => {
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(s)
+}
 
 // protocol always takes this cut of the trading fee; creator picks their share
 // of the rest, liquidity providers (makers) get whatever's left
@@ -250,7 +258,7 @@ interface YfAsset {
 }
 
 function CreateMarket() {
-  const { publicKey } = useTradingWallet()
+  const { publicKey, signTransaction } = useTradingWallet()
   const [priceSource, setPriceSource] = useState('yfinance')
   const [category, setCategory] = useState('crypto')
   const [customCategory, setCustomCategory] = useState('')
@@ -287,12 +295,15 @@ function CreateMarket() {
     (isSelf ? listingPrice > 0 : asset !== null) &&
     !feeBpsError && !creatorFeeError && !feesIncomplete && deploying === null
 
+  // client-signed create: prepare (server plumbing → unsigned tx) → the creator
+  // signs (their USDC funds the seed) → submit → finalize (server seeds the book)
   const onDeploy = async () => {
+    if (!publicKey || !signTransaction) { setDeployError('connect a wallet first'); return }
     setDeployError(null)
     setDeployed(null)
     try {
-      setDeploying('deploying market on-chain…')
-      const res = await fetch('/api/deploy', {
+      setDeploying('preparing…')
+      const prep = await fetch('/api/deploy/prepare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -306,12 +317,27 @@ function CreateMarket() {
           thumbnail: thumbnailUrl || undefined,
           feeBps,
           creatorFeePct: creatorFee,
-          creator: publicKey?.toBase58(),
+          owner: publicKey.toBase58(),
         }),
       })
-      const d = await res.json()
-      if (!res.ok) throw new Error(typeof d.error === 'string' ? d.error : 'deploy failed')
-      setDeployed(d.name)
+      const pd = await prep.json()
+      if (!prep.ok) throw new Error(typeof pd.error === 'string' ? pd.error : 'deploy failed')
+      setDeploying('sign the market creation in your wallet…')
+      const signed = await signTransaction(Transaction.from(b64ToBytes(pd.tx)))
+      const sub = await fetch('/api/trade/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
+      })
+      const sd = await sub.json()
+      if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+      setDeploying('seeding the book…')
+      const fin = await fetch('/api/deploy/finalize', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pd.pending),
+      })
+      const fd = await fin.json()
+      if (!fin.ok) throw new Error(typeof fd.error === 'string' ? fd.error : 'finalize failed')
+      setDeployed(fd.name)
       setNameStr(''); setDescStr(''); setSeedStr(''); setListingPriceStr(''); setAsset(null)
       window.dispatchEvent(new Event('pmxt:trade')) // triggers list refetch
     } catch (e: unknown) {
