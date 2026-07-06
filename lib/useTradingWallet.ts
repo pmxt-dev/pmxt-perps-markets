@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { PublicKey, Transaction } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
@@ -33,11 +33,17 @@ export function useTradingWallet(): TradingWallet {
     if (hasBurner()) startBurner() // auto-connect an existing burner
   }, [])
 
+  // Keypair.publicKey returns a NEW PublicKey object on every access, so reading
+  // it inline gives consumers an unstable reference — their useCallback/useEffect
+  // deps then churn every render (this caused the portfolio to loop-fetch and
+  // flicker). Memoize by base58 so the reference is stable until the burner changes.
+  const burnerB58 = demo && active ? getBurner().publicKey.toBase58() : null
+  const burnerPublicKey = useMemo(() => (burnerB58 ? new PublicKey(burnerB58) : null), [burnerB58])
+
   if (demo) {
-    const publicKey = active ? getBurner().publicKey : null
     return {
-      publicKey,
-      connected: publicKey !== null,
+      publicKey: burnerPublicKey,
+      connected: burnerPublicKey !== null,
       isDemo: true,
       signTransaction: burnerSign,
       connect: startBurner,
