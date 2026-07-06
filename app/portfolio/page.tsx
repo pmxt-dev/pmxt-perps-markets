@@ -37,7 +37,15 @@ interface Fill {
   seqNum: number
 }
 
-type Tab = 'positions' | 'orders' | 'history'
+interface MarketFees {
+  symbol: string
+  creator: string
+  creatorBps: number
+  accruedUsd: number
+  creatorClaimableUsd: number
+}
+
+type Tab = 'positions' | 'orders' | 'history' | 'earnings'
 
 const MARKET_ID_BY_SYMBOL = new Map(
   MARKETS.filter(m => m.chainSymbol).map(m => [m.chainSymbol!, m.id]),
@@ -59,6 +67,8 @@ export default function Portfolio() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('positions')
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [myMarkets, setMyMarkets] = useState<MarketFees[] | null>(null)
+  const [claimingFor, setClaimingFor] = useState<string | null>(null)
 
   const load = useCallback(() => {
     if (!publicKey) { setInfo(null); setOrders(null); setFills(null); return }
@@ -74,6 +84,10 @@ export default function Portfolio() {
       .catch(() => {})
     fetch('/api/chain-markets')
       .then(async r => { const d = await r.json(); if (r.ok && Array.isArray(d.markets)) setMarks(Object.fromEntries(d.markets.map((m: { name: string; markPrice: number }) => [m.name, m.markPrice]))) })
+      .catch(() => {})
+    // markets this wallet created — its share of trading fees, claimable
+    fetch('/api/fees')
+      .then(async r => { const d = await r.json(); if (r.ok && Array.isArray(d.markets)) setMyMarkets((d.markets as MarketFees[]).filter(m => m.creator === owner)) })
       .catch(() => {})
   }, [publicKey])
 
@@ -111,6 +125,25 @@ export default function Portfolio() {
     }
   }
 
+  // permissionless: settles + splits the market's fees, paying the creator's cut
+  // straight to their wallet. No signature needed (the gate PDA signs).
+  const claimFees = async (symbol: string) => {
+    setError(null)
+    setClaimingFor(symbol)
+    try {
+      const r = await fetch('/api/distribute', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol }),
+      })
+      const d = await r.json()
+      if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'claim failed')
+      load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'claim failed')
+    } finally {
+      setClaimingFor(null)
+    }
+  }
+
   if (!connected) {
     return (
       <div className="max-w-lg font-mono">
@@ -133,6 +166,7 @@ export default function Portfolio() {
     { key: 'positions', label: 'positions', count: positions.length },
     { key: 'orders', label: 'open orders', count: orders?.length ?? null },
     { key: 'history', label: 'history', count: fills?.length ?? null },
+    { key: 'earnings', label: 'earnings', count: myMarkets?.length ?? null },
   ]
 
   return (
@@ -273,6 +307,43 @@ export default function Portfolio() {
                   <span className="w-28 text-right text-text">${fmtPrice(f.price)}</span>
                   <span className="w-28 text-right text-muted hidden sm:block">${fmtPrice(f.size * f.price)}</span>
                   <span className="w-16 text-right text-muted hidden sm:block">{f.role}</span>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {tab === 'earnings' && (
+          !myMarkets ? (
+            <div className="px-4 py-4 text-[11px] text-muted">loading…</div>
+          ) : myMarkets.length === 0 ? (
+            <div className="px-4 py-4 text-[11px] text-muted">
+              you haven&apos;t created any markets — <Link href="/" className="text-accent hover:underline">launch one</Link> and earn a share of its trading fees
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50 text-xs">
+              <div className="flex px-4 py-2 text-[10px] text-muted uppercase tracking-widest">
+                <span className="flex-1">market</span>
+                <span className="w-20 text-right">your fee</span>
+                <span className="w-28 text-right hidden sm:block">accrued</span>
+                <span className="w-28 text-right">claimable</span>
+                <span className="w-24 text-right"></span>
+              </div>
+              {myMarkets.map(m => (
+                <div key={m.symbol} className="flex items-center px-4 py-2.5">
+                  <Link href={`/markets/${m.symbol.toLowerCase()}`} className="flex-1 text-text hover:text-accent transition">{m.symbol}</Link>
+                  <span className="w-20 text-right text-muted">{m.creatorBps} bps</span>
+                  <span className="w-28 text-right text-muted hidden sm:block">${fmtPrice(m.accruedUsd)}</span>
+                  <span className={`w-28 text-right ${m.creatorClaimableUsd > 0 ? 'text-yes' : 'text-muted'}`}>${fmtPrice(m.creatorClaimableUsd)}</span>
+                  <span className="w-24 text-right">
+                    <button
+                      onClick={() => claimFees(m.symbol)}
+                      disabled={claimingFor !== null || m.creatorClaimableUsd <= 0}
+                      className="text-[11px] px-2.5 py-1 rounded-md border border-border text-muted hover:text-yes hover:border-yes/40 transition disabled:opacity-40"
+                    >
+                      {claimingFor === m.symbol ? '…' : 'claim'}
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>
