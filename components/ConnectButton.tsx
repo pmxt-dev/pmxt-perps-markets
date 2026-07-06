@@ -3,7 +3,7 @@
 import { useTradingWallet } from '@/lib/useTradingWallet'
 
 export function ConnectButton() {
-  const { publicKey, connected, isDemo, connect, reset } = useTradingWallet()
+  const { publicKey, connected, isDemo, connect, disconnect, reset } = useTradingWallet()
 
   if (connected && publicKey) {
     const addr = publicKey.toBase58()
@@ -20,9 +20,13 @@ export function ConnectButton() {
       )
     }
     return (
-      <span className="font-mono text-xs border border-accent/40 rounded-md px-3 py-1.5 text-accent">
+      <button
+        onClick={() => disconnect?.()}
+        title="disconnect wallet"
+        className="font-mono text-xs border border-accent/40 rounded-md px-3 py-1.5 text-accent hover:border-no/40 hover:text-no transition"
+      >
         {short}
-      </span>
+      </button>
     )
   }
 

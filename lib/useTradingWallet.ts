@@ -18,6 +18,7 @@ export interface TradingWallet {
   isDemo: boolean
   signTransaction: ((tx: Transaction) => Promise<Transaction>) | undefined
   connect: () => void
+  disconnect: (() => void) | undefined
   reset: (() => void) | null
 }
 
@@ -47,6 +48,7 @@ export function useTradingWallet(): TradingWallet {
       isDemo: true,
       signTransaction: burnerSign,
       connect: startBurner,
+      disconnect: undefined, // demo uses reset (regenerate burner) instead
       reset: () => { resetBurner() },
     }
   }
@@ -57,6 +59,7 @@ export function useTradingWallet(): TradingWallet {
     isDemo: false,
     signTransaction: adapter.signTransaction,
     connect: () => setVisible(true),
+    disconnect: () => { void adapter.disconnect() },
     reset: null,
   }
 }
