@@ -85,22 +85,15 @@ export default function Home() {
       .catch(e => {
         if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
       })
-    // total resting liquidity per market: Σ size × level price over both book sides —
-    // same number the detail page shows, from the same chain book
-    MARKETS.forEach(m => {
-      if (m.sourceType !== 'onchain' || !m.chainSymbol) return
-      fetch(`/api/chain-book?symbol=${encodeURIComponent(m.chainSymbol)}`)
-        .then(async r => {
-          const d = await r.json()
-          if (cancelled || !r.ok || !Array.isArray(d.bids) || !Array.isArray(d.asks)) return
-          const notional = [...d.bids, ...d.asks].reduce(
-            (sum: number, l: { price: number; size: number }) => sum + l.size * l.price,
-            0,
-          )
-          setLiquidity(prev => ({ ...prev, [m.id]: notional }))
-        })
-        .catch(() => {})
-    })
+    // total resting liquidity per market: same notional the detail page shows,
+    // batched into one round-trip for all onchain markets
+    fetch('/api/chain-liquidity')
+      .then(async r => {
+        const d = await r.json()
+        if (cancelled || !r.ok || typeof d.liquidity !== 'object' || d.liquidity === null) return
+        setLiquidity(d.liquidity)
+      })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [])
 
