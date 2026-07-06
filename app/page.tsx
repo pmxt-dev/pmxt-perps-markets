@@ -109,6 +109,23 @@ export default function Home() {
             for (const m of entries) next[m.name.toLowerCase()] = m.liquidityUsd
             return next
           })
+          // sparkline for every on-chain market (incl. deployed) from its history
+          for (const m of entries) {
+            const id = m.name.toLowerCase()
+            if (MARKETS.some(sm => sm.id === id)) continue // static ones already handled
+            fetch(`/api/chain-history?symbol=${encodeURIComponent(m.name)}`)
+              .then(async hr => {
+                const h = await hr.json()
+                if (cancelled || !hr.ok || !Array.isArray(h.points)) return
+                const closes = h.points
+                  .map((pt: { p: number }) => pt.p)
+                  .filter((p: unknown): p is number => typeof p === 'number')
+                if (closes.length < 2) return
+                const change = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100
+                setLive(prev => ({ ...prev, [id]: { price: closes[closes.length - 1], change, closes } }))
+              })
+              .catch(() => {})
+          }
         })
         .catch(() => {})
     }
