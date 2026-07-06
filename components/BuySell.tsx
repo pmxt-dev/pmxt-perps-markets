@@ -82,8 +82,11 @@ export default function BuySell({ symbol, price }: BuySellProps) {
     if (!publicKey) return
     setError(null)
     try {
-      setBusy('requesting funds…')
-      await tradeApi('faucet', { owner: publicKey.toBase58() })
+      // no faucet on mainnet — the user deposits their own real USDC
+      if (process.env.NEXT_PUBLIC_NETWORK !== 'mainnet') {
+        setBusy('requesting test funds…')
+        await tradeApi('faucet', { owner: publicKey.toBase58() })
+      }
       setBusy('sign the deposit in your wallet…')
       const { tx } = await tradeApi('setup', { owner: publicKey.toBase58() })
       await signAndSubmit(tx)
@@ -274,7 +277,7 @@ export default function BuySell({ symbol, price }: BuySellProps) {
           disabled={busy !== null}
           className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-50"
         >
-          {busy ?? 'GET $1,000 TEST USDC'}
+          {busy ?? (process.env.NEXT_PUBLIC_NETWORK === 'mainnet' ? 'DEPOSIT USDC' : 'GET $1,000 TEST USDC')}
         </button>
       ) : (
         <button
