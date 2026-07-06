@@ -32,6 +32,8 @@ export function startBurner(): void {
 
 export function isDemoMode(): boolean {
   if (typeof window === 'undefined') return false
+  // mainnet handles real USDC — no in-browser burner, ever; force a real wallet
+  if (process.env.NEXT_PUBLIC_NETWORK === 'mainnet') return false
   const param = new URLSearchParams(window.location.search).get('demo')
   if (param !== null) {
     const on = param !== '0' && param !== 'false'
