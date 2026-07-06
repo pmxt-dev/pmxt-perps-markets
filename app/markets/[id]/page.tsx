@@ -11,6 +11,14 @@ import { useTradingWallet } from '@/lib/useTradingWallet'
 import Sparkline from '@/components/Sparkline'
 import BuySell from '@/components/BuySell'
 import OrderBook, { BookData } from '@/components/OrderBook'
+import { Transaction } from '@solana/web3.js'
+
+const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+const bytesToB64 = (bytes: Uint8Array) => {
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(s)
+}
 
 const TIMEFRAMES = ['1h', '7d', '30d', '1y', '5y', 'all'] as const
 type Timeframe = (typeof TIMEFRAMES)[number]
@@ -358,7 +366,7 @@ interface FeesInfo {
 }
 
 function CreatorFees({ chainSymbol }: { chainSymbol: string }) {
-  const { publicKey } = useTradingWallet()
+  const { publicKey, signTransaction } = useTradingWallet()
   const [info, setInfo] = useState<FeesInfo | null>(null)
   const [claiming, setClaiming] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -379,18 +387,28 @@ function CreatorFees({ chainSymbol }: { chainSymbol: string }) {
   if (!info || !info.creator || publicKey?.toBase58() !== info.creator) return null
   const claimable = info.creatorClaimableUsd
 
+  // client-signed: server builds the settle+distribute tx with the creator as
+  // fee payer, the wallet signs (creator pays their own gas — spam-proof) + submits
   const claim = async () => {
+    if (!publicKey || !signTransaction) return
     setClaiming(true)
     setMsg(null)
     try {
       const r = await fetch('/api/distribute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: chainSymbol }),
+        body: JSON.stringify({ owner: publicKey.toBase58(), symbol: chainSymbol }),
       })
       const d = await r.json()
       if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'claim failed')
-      setMsg(`✓ paid $${fmtPrice(d.creatorPaid ?? 0)} to the creator`)
+      const signed = await signTransaction(Transaction.from(b64ToBytes(d.tx)))
+      const sub = await fetch('/api/trade/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
+      })
+      const sd = await sub.json()
+      if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+      setMsg('✓ fees claimed to your wallet')
       load()
       window.dispatchEvent(new Event('pmxt:trade'))
     } catch (e: unknown) {

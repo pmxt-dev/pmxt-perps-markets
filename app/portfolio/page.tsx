@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Transaction } from '@solana/web3.js'
 import { useTradingWallet } from '@/lib/useTradingWallet'
 import { MARKETS } from '@/lib/data'
-import { fmtPrice } from '@/lib/format'
+import { fmtPrice, fmtSize } from '@/lib/format'
 
 interface Position {
   symbol: string
@@ -125,18 +125,29 @@ export default function Portfolio() {
     }
   }
 
-  // permissionless: settles + splits the market's fees, paying the creator's cut
-  // straight to their wallet. No signature needed (the gate PDA signs).
+  // client-signed: the server builds an unsigned settle+distribute tx with the
+  // creator as fee payer; the wallet signs it (creator pays their own trivial
+  // gas — spam-proof) and submits. Money splits to creator + protocol on-chain.
   const claimFees = async (symbol: string) => {
+    if (!publicKey || !signTransaction) return
     setError(null)
     setClaimingFor(symbol)
     try {
       const r = await fetch('/api/distribute', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner: publicKey.toBase58(), symbol }),
       })
       const d = await r.json()
       if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'claim failed')
+      const signed = await signTransaction(Transaction.from(b64ToBytes(d.tx)))
+      const sub = await fetch('/api/trade/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
+      })
+      const sd = await sub.json()
+      if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
       load()
+      window.dispatchEvent(new Event('pmxt:trade'))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'claim failed')
     } finally {
@@ -220,7 +231,7 @@ export default function Portfolio() {
             <div className="divide-y divide-border/50 text-xs">
               <div className="flex px-4 py-2 text-[10px] text-muted uppercase tracking-widest">
                 <span className="flex-1">market</span>
-                <span className="w-24 text-right">size</span>
+                <span className="w-28 text-right">size</span>
                 <span className="w-28 text-right hidden sm:block">mark</span>
                 <span className="w-28 text-right hidden sm:block">notional</span>
                 <span className="w-28 text-right">unsettled pnl</span>
@@ -231,7 +242,7 @@ export default function Portfolio() {
                 const row = (
                   <>
                     <span className="flex-1 text-text">{p.symbol}</span>
-                    <span className={`w-24 text-right ${p.baseUi > 0 ? 'text-yes' : 'text-no'}`}>{p.baseUi > 0 ? '+' : ''}{p.baseUi}</span>
+                    <span className={`w-28 text-right ${p.baseUi > 0 ? 'text-yes' : 'text-no'}`}>{p.baseUi > 0 ? '+' : ''}{fmtSize(p.baseUi)}</span>
                     <span className="w-28 text-right text-muted hidden sm:block">{mark !== undefined ? `$${fmtPrice(mark)}` : '—'}</span>
                     <span className="w-28 text-right text-text hidden sm:block">{mark !== undefined ? `$${fmtPrice(Math.abs(p.baseUi) * mark)}` : '—'}</span>
                     <span className={`w-28 text-right ${p.unsettledPnlUi >= 0 ? 'text-yes' : 'text-no'}`}>{p.unsettledPnlUi >= 0 ? '+' : ''}{p.unsettledPnlUi.toFixed(2)}</span>
@@ -264,7 +275,7 @@ export default function Portfolio() {
                 <div key={`${o.symbol}-${o.orderId}`} className="flex items-center px-4 py-2.5">
                   <span className="flex-1 text-text">{o.symbol}</span>
                   <span className={`w-14 ${o.side === 'buy' ? 'text-yes' : 'text-no'}`}>{o.side}</span>
-                  <span className="w-24 text-right text-text">{o.size}</span>
+                  <span className="w-24 text-right text-text">{fmtSize(o.size)}</span>
                   <span className="w-28 text-right text-text">${fmtPrice(o.price)}</span>
                   <span className="w-28 text-right text-muted hidden sm:block">${fmtPrice(o.size * o.price)}</span>
                   <span className="w-24 text-right">
@@ -303,7 +314,7 @@ export default function Portfolio() {
                   <span className="w-36 text-muted">{new Date(f.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).toLowerCase()}</span>
                   <span className="flex-1 text-text">{f.symbol}</span>
                   <span className={`w-14 ${f.side === 'buy' ? 'text-yes' : 'text-no'}`}>{f.side}</span>
-                  <span className="w-24 text-right text-text">{f.size}</span>
+                  <span className="w-24 text-right text-text">{fmtSize(f.size)}</span>
                   <span className="w-28 text-right text-text">${fmtPrice(f.price)}</span>
                   <span className="w-28 text-right text-muted hidden sm:block">${fmtPrice(f.size * f.price)}</span>
                   <span className="w-16 text-right text-muted hidden sm:block">{f.role}</span>
