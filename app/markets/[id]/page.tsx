@@ -56,6 +56,7 @@ export default function MarketDetail() {
   const market = staticMarket ?? catalogMarket
   const [liveOracle, setLiveOracle] = useState<number | null>(null)
   const [liveMark, setLiveMark] = useState<number | null>(null)
+  const [liveVol, setLiveVol] = useState<number | null>(null)
   const [tf, setTf] = useState<Timeframe>('7d')
   const [chainTf, setChainTf] = useState<ChainTimeframe>('all')
   const [history, setHistory] = useState<number[] | null>(null)
@@ -107,6 +108,7 @@ export default function MarketDetail() {
           const found = d.markets.find((cm: { name: string }) => cm.name === chainSymbol)
           if (found && typeof found.oraclePrice === 'number') setLiveOracle(found.oraclePrice)
           if (found && typeof found.markPrice === 'number') setLiveMark(found.markPrice)
+          if (found && typeof found.volume24hUsd === 'number') setLiveVol(found.volume24hUsd)
         })
         .catch(e => {
           if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
@@ -310,7 +312,7 @@ export default function MarketDetail() {
             </div>
 
             <div className="p-3 border-t border-border flex justify-between text-[10px] text-muted">
-              <span>vol {fmt(market.volume24h)}</span>
+              <span>vol {fmt(isChain ? (liveVol ?? 0) : market.volume24h)}</span>
               <span>resting liquidity {restingLiquidity !== null ? fmt(restingLiquidity) : '—'}</span>
               <span>onchain · usdc</span>
             </div>
