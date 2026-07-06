@@ -584,7 +584,7 @@ function CreateMarket() {
             {seedTooLow ? `✗ minimum 100 usdc — you entered $${seed}` : 'minimum 100 usdc'}
           </span>
           <span className="block text-[10px] text-muted mt-1">
-            + ~2.5 SOL{solUsd ? ` (≈ $${Math.round(2.5 * solUsd)})` : ''} for the on-chain orderbook — paid from your wallet, locked in the market while it's live
+            + ~2.5 SOL{solUsd ? ` (≈ $${Math.round(2.5 * solUsd)})` : ''} for the on-chain orderbook — paid from your wallet, committed to the market (not withdrawable)
           </span>
         </Field>
 
