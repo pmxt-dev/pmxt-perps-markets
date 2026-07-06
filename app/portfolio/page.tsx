@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useWallet } from '@solana/wallet-adapter-react'
-import { useWalletModal } from '@solana/wallet-adapter-react-ui'
+import { useTradingWallet } from '@/lib/useTradingWallet'
 import { MARKETS } from '@/lib/data'
 import { fmtPrice } from '@/lib/format'
 
@@ -35,8 +34,7 @@ const MARKET_ID_BY_SYMBOL = new Map(
 )
 
 export default function Portfolio() {
-  const { publicKey, connected } = useWallet()
-  const { setVisible } = useWalletModal()
+  const { publicKey, connected, isDemo, connect } = useTradingWallet()
   const [info, setInfo] = useState<AccountInfo | null>(null)
   const [fills, setFills] = useState<Fill[] | null>(null)
   const [marks, setMarks] = useState<Record<string, number>>({})
@@ -88,10 +86,10 @@ export default function Portfolio() {
         <div className="mt-4 border border-border rounded-xl bg-panel p-6 text-center">
           <p className="text-xs text-muted">connect a wallet to see your balance, positions, and trade history</p>
           <button
-            onClick={() => setVisible(true)}
+            onClick={connect}
             className="mt-4 rounded-xl bg-accent/90 hover:bg-accent px-6 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none"
           >
-            CONNECT WALLET
+            {isDemo ? 'START DEMO WALLET' : 'CONNECT WALLET'}
           </button>
         </div>
       </div>
