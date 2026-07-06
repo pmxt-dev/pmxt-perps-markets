@@ -57,6 +57,9 @@ export default function MarketDetail() {
   const [liveOracle, setLiveOracle] = useState<number | null>(null)
   const [liveMark, setLiveMark] = useState<number | null>(null)
   const [liveVol, setLiveVol] = useState<number | null>(null)
+  // is a live external feed driving the oracle right now? (false off-hours) —
+  // drives whether we draw the oracle line at all
+  const [feedLive, setFeedLive] = useState<boolean>(false)
   const [tf, setTf] = useState<Timeframe>('7d')
   const [chainTf, setChainTf] = useState<ChainTimeframe>('all')
   const [history, setHistory] = useState<number[] | null>(null)
@@ -109,6 +112,7 @@ export default function MarketDetail() {
           if (found && typeof found.oraclePrice === 'number') setLiveOracle(found.oraclePrice)
           if (found && typeof found.markPrice === 'number') setLiveMark(found.markPrice)
           if (found && typeof found.volume24hUsd === 'number') setLiveVol(found.volume24hUsd)
+          if (found && typeof found.oracleLive === 'boolean') setFeedLive(found.oracleLive)
         })
         .catch(e => {
           if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
@@ -182,7 +186,7 @@ export default function MarketDetail() {
   })()
   // oracle overlay series (o) for oracle-fed chain markets — traces the feed
   const chainOracleCloses = (() => {
-    if (!isChain || market.selfOracled || !chainPoints) return null
+    if (!isChain || market.selfOracled || !feedLive || !chainPoints) return null
     const windowed = chainTf === 'all'
       ? chainPoints
       : chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
@@ -294,14 +298,16 @@ export default function MarketDetail() {
                   )}
                 </div>
               ) : isChain ? (
-                <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-yes/40 rounded-md px-1.5 py-0.5 pointer-events-none">
+                <div className={`absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border rounded-md px-1.5 py-0.5 pointer-events-none ${feedLive ? 'border-yes/40' : 'border-border'}`}>
                   {chainError ? (
                     <span className="text-no">✗ chain feed: {chainError}</span>
-                  ) : (
+                  ) : feedLive ? (
                     <>
                       <span className="text-yes">— oracle ${fmtPrice(oraclePrice)}</span>
                       <span className="text-muted ml-1.5">pmxt chain · {market.chainSymbol}</span>
                     </>
+                  ) : (
+                    <span className="text-muted">market closed — self-priced overnight · {market.chainSymbol}</span>
                   )}
                 </div>
               ) : (
