@@ -255,6 +255,7 @@ function CreateMarket() {
   const [category, setCategory] = useState('crypto')
   const [customCategory, setCustomCategory] = useState('')
   const [thumbnailUrl, setThumbnailUrl] = useState('')
+  const [thumbError, setThumbError] = useState(false)
   const [feeBpsStr, setFeeBpsStr] = useState('100')
   const [creatorFeeStr, setCreatorFeeStr] = useState('20')
   const [query, setQuery] = useState('')
@@ -319,6 +320,9 @@ function CreateMarket() {
       setDeploying(null)
     }
   }
+
+  // a new thumbnail url gets a fresh chance to load (clears any prior error)
+  useEffect(() => { setThumbError(false) }, [thumbnailUrl])
 
   // when a yfinance asset is picked, auto-fill the description and thumbnail
   // from Yahoo's company profile — but never overwrite what the user typed
@@ -390,13 +394,13 @@ function CreateMarket() {
 
         <Field label="thumbnail (image url)">
           <div className="flex items-center gap-2.5">
-            {thumbnailUrl.trim() && (
+            {thumbnailUrl.trim() && !thumbError && (
               <img
                 src={thumbnailUrl}
                 alt=""
                 className="w-9 h-9 rounded-md object-cover shrink-0 border border-border bg-bg"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.display = '' }}
+                onError={() => setThumbError(true)}
+                onLoad={() => setThumbError(false)}
               />
             )}
             <input
@@ -407,6 +411,9 @@ function CreateMarket() {
               className="flex-1 min-w-0 bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
             />
           </div>
+          {thumbnailUrl.trim() && thumbError && (
+            <p className="text-[10px] text-no mt-1.5">✗ couldn&apos;t load an image from this link — check the url points directly to an image (jpg/png/svg/webp)</p>
+          )}
         </Field>
 
         <Field label="category">
