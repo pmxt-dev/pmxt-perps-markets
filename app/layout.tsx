@@ -25,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
               <nav className="font-mono text-xs flex items-center gap-4">
                 <Link href="/portfolio" className="text-muted hover:text-text transition">portfolio</Link>
+                <a href="/docs" className="text-muted hover:text-text transition">docs</a>
               </nav>
               <div className="flex-1" />
               <ConnectButton />
