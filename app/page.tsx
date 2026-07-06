@@ -493,7 +493,7 @@ function CreateMarket() {
 
         <Field
           label="oracle source"
-          hint={priceSource === 'orderbook' ? 'no external oracle — the market’s own orderbook is the price. for pre-ipo and anything without a feed. trade at your own risk.' : undefined}
+          hint={priceSource === 'orderbook' ? 'self-priced: no external feed — the price is this market’s own order book, time-averaged (EMA) so a single trade can’t move it. for pre-ipo and anything without a real-world feed. pure supply/demand — trade at your own risk.' : undefined}
         >
           <select
             value={priceSource}

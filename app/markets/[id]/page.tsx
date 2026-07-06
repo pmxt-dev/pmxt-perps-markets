@@ -305,7 +305,7 @@ export default function MarketDetail() {
                   {chainError ? (
                     <span className="text-no">✗ chain feed: {chainError}</span>
                   ) : (
-                    <span className="text-muted">self-oracled — the orderbook is the price feed · pmxt chain</span>
+                    <span className="text-muted" title="No external feed. Price = this market's own order book, time-averaged (EMA) so one trade can't move it.">self-priced — the order book is the feed (EMA) · pmxt chain</span>
                   )}
                 </div>
               ) : isChain ? (
@@ -323,7 +323,7 @@ export default function MarketDetail() {
                 </div>
               ) : (
                 <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none text-muted">
-                  self-oracled — the orderbook is the price feed
+                  self-priced — the order book is the feed (EMA)
                 </div>
               )}
             </div>
@@ -372,7 +372,7 @@ function MetaRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function MarketMeta({ chainSymbol }: { chainSymbol: string }) {
-  const [d, setD] = useState<{ oracle?: string; feeBps?: number; creator?: string; creatorBps?: number; protocolBps?: number } | null>(null)
+  const [d, setD] = useState<{ oracle?: string; feeBps?: number; creator?: string; creatorBps?: number; protocolBps?: number; selfOracled?: boolean } | null>(null)
   useEffect(() => {
     let off = false
     Promise.all([
@@ -382,7 +382,7 @@ function MarketMeta({ chainSymbol }: { chainSymbol: string }) {
       if (off) return
       const m = cm?.markets?.find((x: { name: string }) => x.name === chainSymbol)
       const f = fees?.markets?.find((x: { symbol: string }) => x.symbol === chainSymbol)
-      setD({ oracle: m?.oracle, feeBps: m?.feeBps, creator: f?.creator, creatorBps: f?.creatorBps, protocolBps: f?.protocolBps })
+      setD({ oracle: m?.oracle, feeBps: m?.feeBps, creator: f?.creator, creatorBps: f?.creatorBps, protocolBps: f?.protocolBps, selfOracled: m?.selfOracled })
     })
     return () => { off = true }
   }, [chainSymbol])
@@ -397,6 +397,17 @@ function MarketMeta({ chainSymbol }: { chainSymbol: string }) {
     <div className="border border-border rounded-xl bg-panel p-4 font-mono text-xs">
       <div className="text-[10px] text-muted uppercase tracking-widest mb-2">// details</div>
       <div className="flex flex-col gap-1.5">
+        <MetaRow label="pricing">
+          {d.selfOracled ? (
+            <span className="text-text" title="No external price feed. The price is set by this market's own order book, smoothed as a time-average (EMA) of the traded mark — so no single trade can jump it. Common for pre-IPO and anything with no real-world feed. You're trading pure supply and demand.">
+              self-priced <span className="text-muted">· order book (EMA)</span>
+            </span>
+          ) : (
+            <span className="text-text" title="Priced by an external feed (e.g. yfinance). The order book trades around that reference price.">
+              external feed
+            </span>
+          )}
+        </MetaRow>
         <MetaRow label="oracle">
           {d.oracle ? <a href={ex(d.oracle)} target="_blank" rel="noreferrer" className="text-accent hover:underline">{trunc(d.oracle)}</a> : '—'}
         </MetaRow>
