@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MARKETS } from '@/lib/data'
@@ -352,8 +352,63 @@ export default function MarketDetail() {
           <div className="border border-border rounded-xl bg-panel p-4">
             <BuySell symbol={market.symbol} price={markPrice} />
           </div>
+          {chainSymbol && <MarketMeta chainSymbol={chainSymbol} />}
           {chainSymbol && <CreatorFees chainSymbol={chainSymbol} />}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// on-chain provenance: which oracle prices it, who created it + collects fees,
+// the fee and how it splits. Public info — shown to everyone, not just the creator.
+function MetaRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-muted">{label}</span>
+      <span className="text-right truncate">{children}</span>
+    </div>
+  )
+}
+
+function MarketMeta({ chainSymbol }: { chainSymbol: string }) {
+  const [d, setD] = useState<{ oracle?: string; feeBps?: number; creator?: string; creatorBps?: number; protocolBps?: number } | null>(null)
+  useEffect(() => {
+    let off = false
+    Promise.all([
+      fetch('/api/chain-markets').then(r => r.json()).catch(() => null),
+      fetch('/api/fees').then(r => r.json()).catch(() => null),
+    ]).then(([cm, fees]) => {
+      if (off) return
+      const m = cm?.markets?.find((x: { name: string }) => x.name === chainSymbol)
+      const f = fees?.markets?.find((x: { symbol: string }) => x.symbol === chainSymbol)
+      setD({ oracle: m?.oracle, feeBps: m?.feeBps, creator: f?.creator, creatorBps: f?.creatorBps, protocolBps: f?.protocolBps })
+    })
+    return () => { off = true }
+  }, [chainSymbol])
+  if (!d) return null
+  const trunc = (s?: string) => (s ? `${s.slice(0, 4)}…${s.slice(-4)}` : '—')
+  const ex = (s: string) => `https://explorer.solana.com/address/${s}`
+  const lpBps =
+    d.feeBps != null && d.creatorBps != null && d.protocolBps != null
+      ? Math.max(0, d.feeBps - d.creatorBps - d.protocolBps)
+      : null
+  return (
+    <div className="border border-border rounded-xl bg-panel p-4 font-mono text-xs">
+      <div className="text-[10px] text-muted uppercase tracking-widest mb-2">// details</div>
+      <div className="flex flex-col gap-1.5">
+        <MetaRow label="oracle">
+          {d.oracle ? <a href={ex(d.oracle)} target="_blank" rel="noreferrer" className="text-accent hover:underline">{trunc(d.oracle)}</a> : '—'}
+        </MetaRow>
+        <MetaRow label="creator">
+          {d.creator ? <a href={ex(d.creator)} target="_blank" rel="noreferrer" className="text-accent hover:underline">{trunc(d.creator)}</a> : '—'}
+        </MetaRow>
+        <MetaRow label="trade fee">{d.feeBps != null ? `${(d.feeBps / 100).toFixed(2)}%` : '—'}</MetaRow>
+        {lpBps != null && (
+          <MetaRow label="fee split">
+            <span className="text-muted">protocol {d.protocolBps} · creator {d.creatorBps} · LP {lpBps} <span className="opacity-60">bps</span></span>
+          </MetaRow>
+        )}
       </div>
     </div>
   )
