@@ -25,6 +25,7 @@ const CHAIN_TF_MS: Record<Exclude<ChainTimeframe, 'all'>, number> = {
 interface ChainPoint {
   t: number
   p: number
+  o?: number
 }
 
 export default function MarketDetail() {
@@ -32,6 +33,7 @@ export default function MarketDetail() {
   const id = params?.id as string
   const market = MARKETS.find(m => m.id === id)
   const [liveOracle, setLiveOracle] = useState<number | null>(null)
+  const [liveMark, setLiveMark] = useState<number | null>(null)
   const [tf, setTf] = useState<Timeframe>('7d')
   const [chainTf, setChainTf] = useState<ChainTimeframe>('all')
   const [history, setHistory] = useState<number[] | null>(null)
@@ -82,6 +84,7 @@ export default function MarketDetail() {
           setChainError(null)
           const found = d.markets.find((cm: { name: string }) => cm.name === chainSymbol)
           if (found && typeof found.oraclePrice === 'number') setLiveOracle(found.oraclePrice)
+          if (found && typeof found.markPrice === 'number') setLiveMark(found.markPrice)
         })
         .catch(e => {
           if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
@@ -116,7 +119,7 @@ export default function MarketDetail() {
     load()
     loadHistory()
     loadBook()
-    const iv = setInterval(() => { load(); loadHistory(); loadBook() }, 15_000)
+    const iv = setInterval(() => { load(); loadHistory(); loadBook() }, 6_000)
     return () => { cancelled = true; clearInterval(iv) }
   }, [chainSymbol, refreshTick])
 
@@ -138,34 +141,41 @@ export default function MarketDetail() {
   const restingLiquidity = book
     ? [...book.bids, ...book.asks].reduce((sum, l) => sum + l.size * l.price, 0)
     : null
-  // onchain markets: mark = oracle (stub oracle drives the market until the book takes over)
+  // onchain markets: mark = book mid (from the API), which moves with trades.
+  // oraclePrice is the raw stub oracle — only meaningful for oracle-fed markets.
   const oraclePrice = isChain ? (liveOracle ?? market.price) : (liveOracle ?? market.price * 1.0018)
-  const markPrice = isChain ? (liveOracle ?? market.price) : liveOracle ? liveOracle / 1.0018 : market.price
-  // onchain markets: chart = the recorded oracle series, windowed by the selected timeframe
+  const markPrice = isChain ? (liveMark ?? liveOracle ?? market.price) : liveOracle ? liveOracle / 1.0018 : market.price
+  // onchain markets: chart = recorded mark-price series (p), windowed by timeframe
   const chainCloses = (() => {
     if (!isChain || !chainPoints) return null
     const windowed = chainTf === 'all'
       ? chainPoints
       : chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
-    return windowed.length >= 2 ? windowed.map(pt => pt.p) : chainPoints.map(pt => pt.p)
+    const series = windowed.length >= 2 ? windowed : chainPoints
+    return series.map(pt => pt.p)
+  })()
+  // oracle overlay series (o) for oracle-fed chain markets — traces the feed
+  const chainOracleCloses = (() => {
+    if (!isChain || market.selfOracled || !chainPoints) return null
+    const windowed = chainTf === 'all'
+      ? chainPoints
+      : chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
+    const series = windowed.length >= 2 ? windowed : chainPoints
+    const o = series.map(pt => pt.o).filter((v): v is number => typeof v === 'number')
+    return o.length >= 2 ? o : null
   })()
 
   // yfinance markets: chart = real history (mark = oracle / skew), oracle drawn as line series.
-  // onchain markets: chart = the oracle series itself, sampled from the chain (mark = oracle).
+  // onchain markets: chart = the mark-price series; oracle-fed markets overlay the oracle line.
   // orderbook markets: static mock walk, no external oracle to overlay.
   const chartData = isYf && history
     ? history.map((p) => p / 1.0018)
     : chainCloses
       ? chainCloses
       : market.sparkline?.map((p) => p * (markPrice / market.price))
-  // chain markets: mark = oracle, so the orange oracle line traces the mosaic's top edge.
-  // self-oracled markets get no oracle line — their stub oracle is a protocol
-  // placeholder, not a price feed, and drawing it would misrepresent the market.
   const oracleSeries = isYf && history
     ? history
-    : isChain && !market.selfOracled
-      ? chainCloses ?? undefined
-      : undefined
+    : chainOracleCloses ?? undefined
   const changePct = isYf && history
     ? ((history[history.length - 1] - history[0]) / history[0]) * 100
     : chainCloses

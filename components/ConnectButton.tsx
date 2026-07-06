@@ -1,32 +1,37 @@
 'use client'
 
-import { useWallet } from '@solana/wallet-adapter-react'
-import { useWalletModal } from '@solana/wallet-adapter-react-ui'
+import { useTradingWallet } from '@/lib/useTradingWallet'
 
 export function ConnectButton() {
-  const { publicKey, disconnect, connecting } = useWallet()
-  const { setVisible } = useWalletModal()
+  const { publicKey, connected, isDemo, connect, reset } = useTradingWallet()
 
-  if (publicKey) {
+  if (connected && publicKey) {
     const addr = publicKey.toBase58()
+    const short = `${addr.slice(0, 4)}…${addr.slice(-4)}`
+    if (isDemo) {
+      return (
+        <button
+          onClick={() => reset?.()}
+          title="reset demo wallet (generates a fresh burner)"
+          className="font-mono text-xs border border-accent/40 rounded-md px-3 py-1.5 text-accent hover:border-no/40 hover:text-no transition"
+        >
+          demo {short}
+        </button>
+      )
+    }
     return (
-      <button
-        onClick={() => disconnect()}
-        title="disconnect"
-        className="font-mono text-xs border border-accent/40 rounded-md px-3 py-1.5 text-accent hover:border-no/40 hover:text-no transition"
-      >
-        {addr.slice(0, 4)}…{addr.slice(-4)}
-      </button>
+      <span className="font-mono text-xs border border-accent/40 rounded-md px-3 py-1.5 text-accent">
+        {short}
+      </span>
     )
   }
 
   return (
     <button
-      onClick={() => setVisible(true)}
-      disabled={connecting}
-      className="font-mono text-xs border border-border rounded-md px-3 py-1.5 text-muted hover:text-text hover:border-muted transition disabled:opacity-50"
+      onClick={connect}
+      className="font-mono text-xs border border-border rounded-md px-3 py-1.5 text-muted hover:text-text hover:border-muted transition"
     >
-      {connecting ? 'connecting…' : 'connect wallet'}
+      {isDemo ? 'start demo wallet' : 'connect wallet'}
     </button>
   )
 }

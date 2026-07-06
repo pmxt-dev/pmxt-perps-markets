@@ -23,78 +23,84 @@ export default function Home() {
   // for orderbook (self-oracle) markets and as a fallback while quotes load
   useEffect(() => {
     let cancelled = false
-    MARKETS.forEach(m => {
-      if (m.sourceType !== 'yfinance' || !m.sourceTicker) return
-      fetch(`/api/yf-price?symbol=${encodeURIComponent(m.sourceTicker)}`)
-        .then(r => r.json())
-        .then(d => {
-          if (cancelled || typeof d.price !== 'number') return
-          setLive(prev => ({
-            ...prev,
-            [m.id]: {
-              price: d.price,
-              change: typeof d.change === 'number' ? d.change : null,
-              closes: Array.isArray(d.closes) && d.closes.length >= 2 ? d.closes : undefined,
-            },
-          }))
-        })
-        .catch(() => {})
-    })
-    // onchain markets read their oracle from the deployed Hayek chain
-    fetch('/api/chain-markets')
-      .then(async r => {
-        const d = await r.json()
-        if (cancelled) return
-        if (!r.ok || !Array.isArray(d.markets)) {
-          setChainError(typeof d.error === 'string' ? d.error : 'chain feed unreachable')
-          return
-        }
-        setChainError(null)
-        const bySymbol = new Map<string, number>(
-          d.markets.map((cm: { name: string; oraclePrice: number }) => [cm.name, cm.oraclePrice]),
-        )
-        setLive(prev => {
-          const next = { ...prev }
+    const loadAll = () => {
+      MARKETS.forEach(m => {
+        if (m.sourceType !== 'yfinance' || !m.sourceTicker) return
+        fetch(`/api/yf-price?symbol=${encodeURIComponent(m.sourceTicker)}`)
+          .then(r => r.json())
+          .then(d => {
+            if (cancelled || typeof d.price !== 'number') return
+            setLive(prev => ({
+              ...prev,
+              [m.id]: {
+                price: d.price,
+                change: typeof d.change === 'number' ? d.change : null,
+                closes: Array.isArray(d.closes) && d.closes.length >= 2 ? d.closes : undefined,
+              },
+            }))
+          })
+          .catch(() => {})
+      })
+      // onchain markets: mark price (book-driven) from the deployed chain
+      fetch('/api/chain-markets')
+        .then(async r => {
+          const d = await r.json()
+          if (cancelled) return
+          if (!r.ok || !Array.isArray(d.markets)) {
+            setChainError(typeof d.error === 'string' ? d.error : 'chain feed unreachable')
+            return
+          }
+          setChainError(null)
+          const bySymbol = new Map<string, number>(
+            d.markets.map((cm: { name: string; markPrice: number }) => [cm.name, cm.markPrice]),
+          )
+          setLive(prev => {
+            const next = { ...prev }
+            MARKETS.forEach(m => {
+              if (m.sourceType !== 'onchain' || !m.chainSymbol) return
+              const price = bySymbol.get(m.chainSymbol)
+              if (typeof price === 'number') next[m.id] = { ...next[m.id], price, change: next[m.id]?.change ?? null }
+            })
+            return next
+          })
+          // sparklines from the recorded mark-price series
           MARKETS.forEach(m => {
             if (m.sourceType !== 'onchain' || !m.chainSymbol) return
-            const price = bySymbol.get(m.chainSymbol)
-            if (typeof price === 'number') next[m.id] = { price, change: null }
+            fetch(`/api/chain-history?symbol=${encodeURIComponent(m.chainSymbol)}`)
+              .then(async r => {
+                const h = await r.json()
+                if (cancelled || !r.ok || !Array.isArray(h.points)) return
+                const closes = h.points
+                  .map((pt: { p: number }) => pt.p)
+                  .filter((p: unknown): p is number => typeof p === 'number')
+                if (closes.length < 2) return
+                const change = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100
+                setLive(prev => ({
+                  ...prev,
+                  [m.id]: { price: closes[closes.length - 1], change, closes },
+                }))
+              })
+              .catch(() => {})
           })
-          return next
         })
-        // sparklines from the recorded oracle series
-        MARKETS.forEach(m => {
-          if (m.sourceType !== 'onchain' || !m.chainSymbol) return
-          fetch(`/api/chain-history?symbol=${encodeURIComponent(m.chainSymbol)}`)
-            .then(async r => {
-              const h = await r.json()
-              if (cancelled || !r.ok || !Array.isArray(h.points)) return
-              const closes = h.points
-                .map((pt: { p: number }) => pt.p)
-                .filter((p: unknown): p is number => typeof p === 'number')
-              if (closes.length < 2) return
-              const change = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100
-              setLive(prev => ({
-                ...prev,
-                [m.id]: { price: closes[closes.length - 1], change, closes },
-              }))
-            })
-            .catch(() => {})
+        .catch(e => {
+          if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
         })
-      })
-      .catch(e => {
-        if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
-      })
-    // total resting liquidity per market: same notional the detail page shows,
-    // batched into one round-trip for all onchain markets
-    fetch('/api/chain-liquidity')
-      .then(async r => {
-        const d = await r.json()
-        if (cancelled || !r.ok || typeof d.liquidity !== 'object' || d.liquidity === null) return
-        setLiquidity(d.liquidity)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
+      // resting liquidity per market
+      fetch('/api/chain-liquidity')
+        .then(async r => {
+          const d = await r.json()
+          if (cancelled || !r.ok || typeof d.liquidity !== 'object' || d.liquidity === null) return
+          setLiquidity(d.liquidity)
+        })
+        .catch(() => {})
+    }
+    loadAll()
+    const iv = setInterval(loadAll, 8_000)
+    // a trade anywhere refreshes the list immediately
+    const onTrade = () => loadAll()
+    window.addEventListener('pmxt:trade', onTrade)
+    return () => { cancelled = true; clearInterval(iv); window.removeEventListener('pmxt:trade', onTrade) }
   }, [])
 
   const filteredMarkets = selectedCategory === 'All'

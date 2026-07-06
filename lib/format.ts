@@ -4,5 +4,5 @@ export function fmtPrice(p: number): string {
   if (Math.abs(p) >= 1) {
     return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
-  return p.toLocaleString('en-US', { maximumSignificantDigits: 4 })
+  return p.toLocaleString('en-US', { minimumSignificantDigits: 3, maximumSignificantDigits: 4 })
 }

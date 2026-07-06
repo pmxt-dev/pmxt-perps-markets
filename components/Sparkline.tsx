@@ -41,8 +41,14 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
 
   const oracleOk = oracleSeries && oracleSeries.length >= 2
   const all = oracleOk ? [...data, ...oracleSeries] : data
-  const min = Math.min(...all)
-  const max = Math.max(...all)
+  const rawMin = Math.min(...all)
+  const rawMax = Math.max(...all)
+  // pad the y-range: flat series render mid-height instead of collapsing to the
+  // bottom row, and tiny wiggles stop being amplified to full chart height
+  const rawRange = rawMax - rawMin
+  const pad = rawRange > 0 ? rawRange * 0.15 : Math.abs(rawMax) * 0.5 || 1
+  const min = rawMin - pad
+  const max = rawMax + pad
   const range = max - min || 1
 
   const w = COLS * CELL
