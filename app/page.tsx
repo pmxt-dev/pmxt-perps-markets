@@ -379,13 +379,24 @@ function CreateMarket() {
         </Field>
 
         <Field label="thumbnail (image url)">
-          <input
-            type="text"
-            value={thumbnailUrl}
-            onChange={(e) => setThumbnailUrl(e.target.value)}
-            placeholder="https://… square image shown next to the name"
-            className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
-          />
+          <div className="flex items-center gap-2.5">
+            {thumbnailUrl.trim() && (
+              <img
+                src={thumbnailUrl}
+                alt=""
+                className="w-9 h-9 rounded-md object-cover shrink-0 border border-border bg-bg"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.display = '' }}
+              />
+            )}
+            <input
+              type="text"
+              value={thumbnailUrl}
+              onChange={(e) => setThumbnailUrl(e.target.value)}
+              placeholder="https://… square image shown next to the name"
+              className="flex-1 min-w-0 bg-bg border border-border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none focus:border-muted transition"
+            />
+          </div>
         </Field>
 
         <Field label="category">
