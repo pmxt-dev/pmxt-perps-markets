@@ -310,6 +310,25 @@ function CreateMarket() {
   const creatorFeeError = creatorFeeStr.trim() !== '' && (isNaN(creatorFee) || creatorFee > 50)
   const feesIncomplete = feeBpsStr.trim() === '' || creatorFeeStr.trim() === ''
 
+  // when a yfinance asset is picked and no description was written yet,
+  // auto-fill it from Yahoo's company profile (never overwrite user text)
+  useEffect(() => {
+    if (priceSource !== 'yfinance' || !asset || descStr.trim() !== '') return
+    let cancelled = false
+    fetch(`/api/yf-profile?symbol=${encodeURIComponent(asset.symbol)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled) return
+        const desc = typeof d.description === 'string' && d.description.trim()
+          ? d.description.trim()
+          : `perpetual future on ${asset.name.toLowerCase()} (${asset.symbol}), priced via yfinance.`
+        setDescStr(desc)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asset, priceSource])
+
   useEffect(() => {
     if (priceSource !== 'yfinance' || !query.trim() || asset) {
       setResults([])
