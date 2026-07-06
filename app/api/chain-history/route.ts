@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // {t, p} point series the charts expect (p = candle close).
 const CHAIN_MARKETS_API = process.env.CHAIN_MARKETS_API ?? 'http://65.109.107.152:8790'
 
-interface Candle { t: number; c: number }
+interface Candle { t: number; c: number; oc: number | null }
 
 export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get('symbol')?.trim()
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       const message = typeof data?.error?.message === 'string' ? data.error.message : `chain feed returned ${res.status}`
       return NextResponse.json({ error: message }, { status: 502 })
     }
-    return NextResponse.json({ symbol, points: (data as Candle[]).map((k) => ({ t: k.t, p: k.c })) })
+    return NextResponse.json({ symbol, points: (data as Candle[]).map((k) => ({ t: k.t, p: k.c, o: k.oc })) })
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'chain feed unreachable' }, { status: 502 })
   }
