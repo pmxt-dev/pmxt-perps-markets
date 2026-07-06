@@ -96,12 +96,19 @@ export default function Home() {
           setLiquidity(d.liquidity)
         })
         .catch(() => {})
-      // full catalog — surfaces markets deployed at runtime
+      // full catalog — surfaces markets deployed at runtime, and carries
+      // liquidity for every on-chain market (static + deployed)
       fetch('/api/catalog')
         .then(async r => {
           const d = await r.json()
           if (cancelled || !r.ok || !Array.isArray(d.markets)) return
-          setExtra((d.markets as CatalogEntry[]).map(catalogToMarket))
+          const entries = d.markets as CatalogEntry[]
+          setExtra(entries.map(catalogToMarket))
+          setLiquidity(prev => {
+            const next = { ...prev }
+            for (const m of entries) next[m.name.toLowerCase()] = m.liquidityUsd
+            return next
+          })
         })
         .catch(() => {})
     }
