@@ -310,19 +310,26 @@ function CreateMarket() {
   const creatorFeeError = creatorFeeStr.trim() !== '' && (isNaN(creatorFee) || creatorFee > 50)
   const feesIncomplete = feeBpsStr.trim() === '' || creatorFeeStr.trim() === ''
 
-  // when a yfinance asset is picked and no description was written yet,
-  // auto-fill it from Yahoo's company profile (never overwrite user text)
+  // when a yfinance asset is picked, auto-fill the description and thumbnail
+  // from Yahoo's company profile — but never overwrite what the user typed
   useEffect(() => {
-    if (priceSource !== 'yfinance' || !asset || descStr.trim() !== '') return
+    if (priceSource !== 'yfinance' || !asset) return
+    const needsDesc = descStr.trim() === ''
+    const needsThumb = thumbnailUrl.trim() === ''
+    if (!needsDesc && !needsThumb) return
     let cancelled = false
     fetch(`/api/yf-profile?symbol=${encodeURIComponent(asset.symbol)}`)
       .then(r => r.json())
       .then(d => {
         if (cancelled) return
-        const desc = typeof d.description === 'string' && d.description.trim()
-          ? d.description.trim()
-          : `perpetual future on ${asset.name.toLowerCase()} (${asset.symbol}), priced via yfinance.`
-        setDescStr(desc)
+        if (needsDesc) {
+          setDescStr(
+            typeof d.description === 'string' && d.description.trim()
+              ? d.description.trim()
+              : `perpetual future on ${asset.name.toLowerCase()} (${asset.symbol}), priced via yfinance.`,
+          )
+        }
+        if (needsThumb && typeof d.logo === 'string' && d.logo) setThumbnailUrl(d.logo)
       })
       .catch(() => {})
     return () => { cancelled = true }

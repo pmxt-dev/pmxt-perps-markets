@@ -36,16 +36,33 @@ export async function GET(req: NextRequest) {
       `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=assetProfile&crumb=${encodeURIComponent(a.crumb)}`,
       { headers: { 'User-Agent': UA, Cookie: a.cookie }, next: { revalidate: 86400 } },
     )
-    if (!res.ok) return NextResponse.json({ description: null })
+    if (!res.ok) return NextResponse.json({ description: null, logo: null })
     const data = await res.json()
-    const summary: unknown = data?.quoteSummary?.result?.[0]?.assetProfile?.longBusinessSummary
-    if (typeof summary !== 'string' || !summary.trim()) {
-      return NextResponse.json({ description: null })
+    const profile = data?.quoteSummary?.result?.[0]?.assetProfile
+
+    const summary: unknown = profile?.longBusinessSummary
+    let description: string | null = null
+    if (typeof summary === 'string' && summary.trim()) {
+      const trimmed = summary.trim()
+      description = (trimmed.length > 320 ? trimmed.slice(0, 320).replace(/\s+\S*$/, '') + '…' : trimmed).toLowerCase()
     }
-    const trimmed = summary.trim()
-    const cut = trimmed.length > 320 ? trimmed.slice(0, 320).replace(/\s+\S*$/, '') + '…' : trimmed
-    return NextResponse.json({ description: cut.toLowerCase() })
+
+    // company website → favicon logo, verified to exist before offering it
+    let logo: string | null = null
+    const website: unknown = profile?.website
+    if (typeof website === 'string' && website) {
+      const domain = website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]
+      if (domain) {
+        const candidate = `https://icons.duckduckgo.com/ip3/${domain}.ico`
+        try {
+          const check = await fetch(candidate, { signal: AbortSignal.timeout(6000) })
+          if (check.ok) logo = candidate
+        } catch { /* no logo */ }
+      }
+    }
+
+    return NextResponse.json({ description, logo })
   } catch {
-    return NextResponse.json({ description: null })
+    return NextResponse.json({ description: null, logo: null })
   }
 }
