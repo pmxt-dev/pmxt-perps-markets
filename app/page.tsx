@@ -277,6 +277,12 @@ function CreateMarket() {
   const [deploying, setDeploying] = useState<string | null>(null)
   const [deployError, setDeployError] = useState<string | null>(null)
   const [deployed, setDeployed] = useState<string | null>(null)
+  const [solUsd, setSolUsd] = useState<number | null>(null)
+
+  // live SOL price so the ~2.5 SOL orderbook rent shows in USD (it moves over time)
+  useEffect(() => {
+    fetch('/api/sol-price').then(r => r.json()).then(d => { if (typeof d.usd === 'number') setSolUsd(d.usd) }).catch(() => {})
+  }, [])
 
   const seed = parseFloat(seedStr) || 0
   const seedTooLow = seedStr !== '' && seed < 100
@@ -322,14 +328,20 @@ function CreateMarket() {
       })
       const pd = await prep.json()
       if (!prep.ok) throw new Error(typeof pd.error === 'string' ? pd.error : 'deploy failed')
-      setDeploying('sign the market creation in your wallet…')
-      const signed = await signTransaction(Transaction.from(b64ToBytes(pd.tx)))
-      const sub = await fetch('/api/trade/submit', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
-      })
-      const sd = await sub.json()
-      if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+      // sign + submit each tx IN ORDER: [0] book accounts (you pay the ~2.4 SOL
+      // rent), then [1] create_perp_market (your USDC funds the seed). The accounts
+      // tx must confirm before the create tx that initializes them.
+      const txs: string[] = Array.isArray(pd.txs) ? pd.txs : [pd.tx]
+      for (let i = 0; i < txs.length; i++) {
+        setDeploying(txs.length > 1 ? (i === 0 ? 'sign 1/2 — fund the order book…' : 'sign 2/2 — create the market…') : 'sign the market creation…')
+        const signed = await signTransaction(Transaction.from(b64ToBytes(txs[i])))
+        const sub = await fetch('/api/trade/submit', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
+        })
+        const sd = await sub.json()
+        if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+      }
       setDeploying('seeding the book…')
       const fin = await fetch('/api/deploy/finalize', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -560,6 +572,9 @@ function CreateMarket() {
           />
           <span className={`text-[10px] ${seedTooLow ? 'text-no' : 'text-muted'}`}>
             {seedTooLow ? `✗ minimum 100 usdc — you entered $${seed}` : 'minimum 100 usdc'}
+          </span>
+          <span className="block text-[10px] text-muted mt-1">
+            + ~2.5 SOL{solUsd ? ` (≈ $${Math.round(2.5 * solUsd)})` : ''} to create the orderbook — paid from your wallet, refundable if you delist
           </span>
         </Field>
 
