@@ -341,7 +341,7 @@ export default function MarketDetail() {
         </div>
 
         <div className="md:col-span-1 flex flex-col gap-6">
-          <div className="border border-border rounded-xl bg-panel p-4 sticky top-20">
+          <div className="border border-border rounded-xl bg-panel p-4">
             <BuySell symbol={market.symbol} price={markPrice} />
           </div>
           {chainSymbol && <CreatorFees chainSymbol={chainSymbol} />}
