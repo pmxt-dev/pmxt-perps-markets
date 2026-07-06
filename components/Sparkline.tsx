@@ -14,7 +14,9 @@ const BAYER = [
 interface SparklineProps {
   data: number[]
   isPositive?: boolean
-  oracleSeries?: number[]
+  // may contain nulls: a null is a gap (market closed, no live feed) and breaks
+  // the oracle line into separate segments
+  oracleSeries?: (number | null)[]
 }
 
 const COLS = 60
@@ -35,12 +37,28 @@ function sampleTo(data: number[], cols: number): number[] {
   return out
 }
 
+// null-aware resample: a column touching a null neighbour is itself null (a gap)
+function sampleToNullable(data: (number | null)[], cols: number): (number | null)[] {
+  const out: (number | null)[] = []
+  for (let c = 0; c < cols; c++) {
+    const pos = (c / (cols - 1)) * (data.length - 1)
+    const idx = Math.floor(pos)
+    const a = data[idx]
+    const b = data[Math.min(idx + 1, data.length - 1)]
+    if (a == null || b == null) { out.push(null); continue }
+    const frac = pos - idx
+    out.push(a * (1 - frac) + b * frac)
+  }
+  return out
+}
+
 export default function Sparkline({ data, isPositive, oracleSeries }: SparklineProps) {
   const [hover, setHover] = useState<number | null>(null)
   if (!data || data.length < 2) return null
 
-  const oracleOk = oracleSeries && oracleSeries.length >= 2
-  const all = oracleOk ? [...data, ...oracleSeries] : data
+  const oracleOk = !!oracleSeries && oracleSeries.some((v) => v != null)
+  const oracleVals = oracleOk ? oracleSeries!.filter((v): v is number => v != null) : []
+  const all = oracleVals.length ? [...data, ...oracleVals] : data
   const rawMin = Math.min(...all)
   const rawMax = Math.max(...all)
   // pad the y-range: flat series render mid-height instead of collapsing to the
@@ -55,7 +73,7 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
   const h = ROWS * CELL
 
   const sampled = sampleTo(data, COLS)
-  const sampledOracle = oracleOk ? sampleTo(oracleSeries, COLS) : null
+  const sampledOracle = oracleOk ? sampleToNullable(oracleSeries!, COLS) : null
 
   const trend = isPositive ?? data[data.length - 1] >= data[0]
   const color = trend ? '#00d68f' : '#ff4d5e'
@@ -94,14 +112,17 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
     }
   }
 
-  const oraclePoints = sampledOracle
-    ? sampledOracle
-        .map((v, c) => {
-          const y = h - (((v - min) / range) * (ROWS - 2) + 1) * CELL
-          return `${c * CELL + CELL / 2},${y}`
-        })
-        .join(' ')
-    : null
+  // break the oracle line at nulls (market-closed gaps) into separate segments
+  const oracleSegments: string[][] = []
+  if (sampledOracle) {
+    let seg: string[] = []
+    sampledOracle.forEach((v, c) => {
+      if (v == null) { if (seg.length) { oracleSegments.push(seg); seg = [] } return }
+      const y = h - (((v - min) / range) * (ROWS - 2) + 1) * CELL
+      seg.push(`${c * CELL + CELL / 2},${y}`)
+    })
+    if (seg.length) oracleSegments.push(seg)
+  }
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -120,9 +141,10 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
         onMouseLeave={() => setHover(null)}
       >
         {dots}
-        {oraclePoints && (
+        {oracleSegments.filter((s) => s.length >= 2).map((s, i) => (
           <polyline
-            points={oraclePoints}
+            key={`o${i}`}
+            points={s.join(' ')}
             fill="none"
             stroke="#ff9f43"
             strokeWidth={2}
@@ -130,7 +152,7 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
             strokeLinecap="round"
             opacity={0.95}
           />
-        )}
+        ))}
         {hover != null && (
           <line
             x1={hover * CELL + CELL / 2}
@@ -147,8 +169,8 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
       {hover != null && (
         <div className="absolute top-1.5 right-1.5 font-mono text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
           <span className={trend ? 'text-yes' : 'text-no'}>${fmtPrice(sampled[hover])}</span>
-          {sampledOracle && (
-            <span className="text-[#ff9f43] ml-1.5">oracle ${fmtPrice(sampledOracle[hover])}</span>
+          {sampledOracle && sampledOracle[hover] != null && (
+            <span className="text-[#ff9f43] ml-1.5">oracle ${fmtPrice(sampledOracle[hover]!)}</span>
           )}
         </div>
       )}

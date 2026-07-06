@@ -7,6 +7,7 @@ import { MARKETS } from '@/lib/data'
 import { Market } from '@/lib/types'
 import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
 import { fmtPrice } from '@/lib/format'
+import { useTradingWallet } from '@/lib/useTradingWallet'
 import Sparkline from '@/components/Sparkline'
 import BuySell from '@/components/BuySell'
 import OrderBook, { BookData } from '@/components/OrderBook'
@@ -27,7 +28,7 @@ const CHAIN_TF_MS: Record<Exclude<ChainTimeframe, 'all'>, number> = {
 interface ChainPoint {
   t: number
   p: number
-  o?: number
+  o?: number | null // null = market closed at this point → gap in the oracle line
 }
 
 export default function MarketDetail() {
@@ -184,15 +185,17 @@ export default function MarketDetail() {
     const series = windowed.length >= 2 ? windowed : chainPoints
     return series.map(pt => pt.p)
   })()
-  // oracle overlay series (o) for oracle-fed chain markets — traces the feed
+  // oracle overlay series for oracle-fed chain markets — traces the feed, with
+  // nulls (gaps) where the market was closed so the line breaks into per-session
+  // segments instead of drawing a fake continuous feed
   const chainOracleCloses = (() => {
-    if (!isChain || market.selfOracled || !feedLive || !chainPoints) return null
+    if (!isChain || market.selfOracled || !chainPoints) return null
     const windowed = chainTf === 'all'
       ? chainPoints
       : chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
     const series = windowed.length >= 2 ? windowed : chainPoints
-    const o = series.map(pt => pt.o).filter((v): v is number => typeof v === 'number')
-    return o.length >= 2 ? o : null
+    const o = series.map(pt => (typeof pt.o === 'number' ? pt.o : null))
+    return o.some(v => v !== null) ? o : null
   })()
 
   // yfinance markets: chart = real history (mark = oracle / skew), oracle drawn as line series.
@@ -337,11 +340,90 @@ export default function MarketDetail() {
           </div>
         </div>
 
-        <div className="md:col-span-1">
+        <div className="md:col-span-1 flex flex-col gap-6">
           <div className="border border-border rounded-xl bg-panel p-4 sticky top-20">
             <BuySell symbol={market.symbol} price={markPrice} />
           </div>
+          {chainSymbol && <CreatorFees chainSymbol={chainSymbol} />}
         </div>
+      </div>
+    </div>
+  )
+}
+
+interface FeesInfo {
+  creator: string | null
+  creatorClaimableUsd: number
+  treasuryClaimableUsd: number
+}
+
+function CreatorFees({ chainSymbol }: { chainSymbol: string }) {
+  const { publicKey } = useTradingWallet()
+  const [info, setInfo] = useState<FeesInfo | null>(null)
+  const [claiming, setClaiming] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  const load = () =>
+    fetch(`/api/fees-info?symbol=${encodeURIComponent(chainSymbol)}`)
+      .then(r => r.json())
+      .then(d => { if (typeof d.creatorClaimableUsd === 'number') setInfo(d) })
+      .catch(() => {})
+
+  useEffect(() => {
+    load()
+    const iv = setInterval(load, 20_000)
+    return () => clearInterval(iv)
+  }, [chainSymbol])
+
+  if (!info || !info.creator) return null
+  const isCreator = publicKey?.toBase58() === info.creator
+  const claimable = info.creatorClaimableUsd
+
+  const claim = async () => {
+    setClaiming(true)
+    setMsg(null)
+    try {
+      const r = await fetch('/api/distribute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: chainSymbol }),
+      })
+      const d = await r.json()
+      if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'claim failed')
+      setMsg(`✓ paid $${fmtPrice(d.creatorPaid ?? 0)} to the creator`)
+      load()
+      window.dispatchEvent(new Event('pmxt:trade'))
+    } catch (e: unknown) {
+      setMsg(`✗ ${e instanceof Error ? e.message : 'claim failed'}`)
+    } finally {
+      setClaiming(false)
+    }
+  }
+
+  return (
+    <div className="border border-border rounded-xl bg-panel overflow-hidden font-mono">
+      <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
+        // creator fees{isCreator ? ' · your market' : ''}
+      </div>
+      <div className="p-4 flex flex-col gap-3 text-xs">
+        <div className="flex justify-between">
+          <span className="text-muted">creator</span>
+          <span className="text-text">{info.creator.slice(0, 4)}…{info.creator.slice(-4)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted">claimable</span>
+          <span className="text-yes text-sm">${fmtPrice(claimable)}</span>
+        </div>
+        <button
+          onClick={claim}
+          disabled={claiming}
+          className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-2.5 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {claiming ? 'claiming…' : 'CLAIM FEES'}
+        </button>
+        <p className="text-[10px] text-muted text-center">
+          {msg ?? 'pays the creator + protocol their split, straight to their wallets'}
+        </p>
       </div>
     </div>
   )
