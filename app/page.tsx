@@ -328,13 +328,8 @@ function CreateMarket() {
       })
       const pd = await prep.json()
       if (!prep.ok) throw new Error(typeof pd.error === 'string' ? pd.error : 'deploy failed')
-      // sign + submit each tx IN ORDER: [0] book accounts (you pay the ~2.4 SOL
-      // rent), then [1] create_perp_market (your USDC funds the seed). The accounts
-      // tx must confirm before the create tx that initializes them.
-      const txs: string[] = Array.isArray(pd.txs) ? pd.txs : [pd.tx]
-      for (let i = 0; i < txs.length; i++) {
-        setDeploying(txs.length > 1 ? (i === 0 ? 'sign 1/2 — fund the order book…' : 'sign 2/2 — create the market…') : 'sign the market creation…')
-        const signed = await signTransaction(Transaction.from(b64ToBytes(txs[i])))
+      const submit = async (txB64: string) => {
+        const signed = await signTransaction(Transaction.from(b64ToBytes(txB64)))
         const sub = await fetch('/api/trade/submit', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
@@ -342,10 +337,25 @@ function CreateMarket() {
         const sd = await sub.json()
         if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
       }
+      // 1/2 — fund the order book (you pay the ~2.5 SOL rent). /submit waits for
+      // confirmation, so the accounts exist before the create tx initializes them.
+      setDeploying('sign 1/2 — fund the order book…')
+      await submit(pd.tx)
+      // 2/2 — create the market. The server rebuilds this tx with a FRESH blockhash
+      // (and fresh oracle) right now, so this second prompt can't expire while you
+      // were deciding on the first.
+      setDeploying('sign 2/2 — create the market…')
+      const cr = await fetch('/api/deploy/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pd.pending),
+      })
+      const cd = await cr.json()
+      if (!cr.ok) throw new Error(typeof cd.error === 'string' ? cd.error : 'create failed')
+      await submit(cd.tx)
       setDeploying('seeding the book…')
       const fin = await fetch('/api/deploy/finalize', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pd.pending),
+        body: JSON.stringify({ ...pd.pending, oracle: cd.oracle }),
       })
       const fd = await fin.json()
       if (!fin.ok) throw new Error(typeof fd.error === 'string' ? fd.error : 'finalize failed')
