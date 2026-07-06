@@ -6,7 +6,12 @@ import { MARKETS, CATEGORIES } from '@/lib/data'
 import { fmtPrice } from '@/lib/format'
 import { Category, Market } from '@/lib/types'
 import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
+import { useTradingWallet } from '@/lib/useTradingWallet'
 import Sparkline from '@/components/Sparkline'
+
+// protocol always takes this cut of the trading fee; creator picks their share
+// of the rest, liquidity providers (makers) get whatever's left
+const PROTOCOL_FEE_PCT = 30
 
 interface LiveQuote {
   price: number
@@ -245,6 +250,7 @@ interface YfAsset {
 }
 
 function CreateMarket() {
+  const { publicKey } = useTradingWallet()
   const [priceSource, setPriceSource] = useState('yfinance')
   const [category, setCategory] = useState('crypto')
   const [customCategory, setCustomCategory] = useState('')
@@ -268,9 +274,17 @@ function CreateMarket() {
   const isSelf = priceSource === 'orderbook'
   const listingPrice = parseFloat(listingPriceStr) || 0
 
+  // free-form fee inputs: never rewrite what the user typed, just flag out-of-bounds
+  const feeBps = /^\d+$/.test(feeBpsStr.trim()) ? parseInt(feeBpsStr.trim(), 10) : NaN
+  const feeBpsError = feeBpsStr.trim() !== '' && (isNaN(feeBps) || feeBps < 1 || feeBps > 1000)
+  const creatorFee = /^\d+$/.test(creatorFeeStr.trim()) ? parseInt(creatorFeeStr.trim(), 10) : NaN
+  const creatorFeeError = creatorFeeStr.trim() !== '' && (isNaN(creatorFee) || creatorFee > 50)
+  const feesIncomplete = feeBpsStr.trim() === '' || creatorFeeStr.trim() === ''
+
   const canDeploy =
     nameStr.trim() !== '' && !seedTooLow && seed >= 100 &&
-    (isSelf ? listingPrice > 0 : asset !== null) && deploying === null
+    (isSelf ? listingPrice > 0 : asset !== null) &&
+    !feeBpsError && !creatorFeeError && !feesIncomplete && deploying === null
 
   const onDeploy = async () => {
     setDeployError(null)
@@ -289,6 +303,9 @@ function CreateMarket() {
           initialPrice: isSelf ? listingPrice : undefined,
           seedUsdc: seed,
           thumbnail: thumbnailUrl || undefined,
+          feeBps,
+          creatorFeePct: creatorFee,
+          creator: publicKey?.toBase58(),
         }),
       })
       const d = await res.json()
@@ -302,13 +319,6 @@ function CreateMarket() {
       setDeploying(null)
     }
   }
-
-  // free-form fee inputs: never rewrite what the user typed, just flag out-of-bounds
-  const feeBps = /^\d+$/.test(feeBpsStr.trim()) ? parseInt(feeBpsStr.trim(), 10) : NaN
-  const feeBpsError = feeBpsStr.trim() !== '' && (isNaN(feeBps) || feeBps < 1 || feeBps > 1000)
-  const creatorFee = /^\d+$/.test(creatorFeeStr.trim()) ? parseInt(creatorFeeStr.trim(), 10) : NaN
-  const creatorFeeError = creatorFeeStr.trim() !== '' && (isNaN(creatorFee) || creatorFee > 50)
-  const feesIncomplete = feeBpsStr.trim() === '' || creatorFeeStr.trim() === ''
 
   // when a yfinance asset is picked, auto-fill the description and thumbnail
   // from Yahoo's company profile — but never overwrite what the user typed
@@ -543,7 +553,7 @@ function CreateMarket() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted">protocol fee</span>
-              <span className="text-text">30% of trading fees · fixed</span>
+              <span className="text-text">{PROTOCOL_FEE_PCT}% of trading fees · fixed</span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted">creator fee</span>
@@ -563,7 +573,7 @@ function CreateMarket() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted">liquidity providers</span>
-              <span className="text-text">{!isNaN(creatorFee) && !creatorFeeError ? `${70 - creatorFee}%` : '—'}</span>
+              <span className="text-text">{!isNaN(creatorFee) && !creatorFeeError ? `${100 - PROTOCOL_FEE_PCT - creatorFee}%` : '—'}</span>
             </div>
           </div>
           {feeBpsError ? (
