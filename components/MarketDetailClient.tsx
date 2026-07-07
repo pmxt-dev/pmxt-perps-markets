@@ -38,6 +38,21 @@ interface ChainPoint {
   o?: number | null // null = market closed at this point → gap in the oracle line
 }
 
+// Format the next scheduled oracle print for the chart overlay: the viewer's
+// LOCAL wall-clock time plus a live, timezone-agnostic countdown, e.g.
+// "10:00 PM (in 9h 12m)". `now` is passed in so the caller's ticking clock
+// drives the re-render. If the time has already passed, we show just the time.
+function fmtNextOracle(atMs: number, now: number): string {
+  const time = new Date(atMs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const diffMs = atMs - now
+  if (diffMs <= 0) return time
+  const totalMin = Math.floor(diffMs / 60_000)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  const rel = h > 0 ? `${h}h ${m}m` : `${m}m`
+  return `${time} (in ${rel})`
+}
+
 export default function MarketDetailClient({ id }: { id: string }) {
   const staticMarket = MARKETS.find(m => m.id === id)
   // markets deployed at runtime aren't in the static catalog — resolve from chain
@@ -66,6 +81,16 @@ export default function MarketDetailClient({ id }: { id: string }) {
   // is a live external feed driving the oracle right now? (false off-hours) —
   // drives whether we draw the oracle line at all
   const [feedLive, setFeedLive] = useState<boolean>(false)
+  // scheduled-feed markets (e.g. DDR5/dramexchange): epoch ms of the next oracle
+  // print. Between prints the book keeps trading (book-led, still live) — we show
+  // a live countdown to the next session instead of "market closed".
+  const [nextOracleAt, setNextOracleAt] = useState<number | null>(null)
+  // ticking clock so the "next oracle (in …)" countdown re-renders as it runs down
+  const [nowTick, setNowTick] = useState<number>(() => Date.now())
+  useEffect(() => {
+    const iv = setInterval(() => setNowTick(Date.now()), 30_000)
+    return () => clearInterval(iv)
+  }, [])
   const [tf, setTf] = useState<Timeframe>('7d')
   const [chainTf, setChainTf] = useState<ChainTimeframe>('all')
   const [history, setHistory] = useState<number[] | null>(null)
@@ -119,6 +144,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
           if (found && typeof found.markPrice === 'number') setLiveMark(found.markPrice)
           if (found && typeof found.volume24hUsd === 'number') setLiveVol(found.volume24hUsd)
           if (found && typeof found.oracleLive === 'boolean') setFeedLive(found.oracleLive)
+          setNextOracleAt(found && typeof found.nextOracleAt === 'number' ? found.nextOracleAt : null)
         })
         .catch(e => {
           if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
@@ -306,7 +332,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
                   )}
                 </div>
               ) : isChain ? (
-                <div className={`absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border rounded-md px-1.5 py-0.5 pointer-events-none ${feedLive ? 'border-yes/40' : 'border-border'}`}>
+                <div className={`absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border rounded-md px-1.5 py-0.5 pointer-events-none ${(feedLive || nextOracleAt) ? 'border-yes/40' : 'border-border'}`}>
                   {chainError ? (
                     <span className="text-no">✗ chain feed: {chainError}</span>
                   ) : feedLive ? (
@@ -314,8 +340,15 @@ export default function MarketDetailClient({ id }: { id: string }) {
                       <span className="text-yes">— oracle ${fmtPrice(oraclePrice)}</span>
                       <span className="text-muted ml-1.5">pmxt chain · {market.chainSymbol}</span>
                     </>
+                  ) : nextOracleAt ? (
+                    // scheduled feed between prints: NOT closed. Book leads; oracle
+                    // re-anchors at the next session. Keep the green "live" badge.
+                    <>
+                      <span className="text-yes" title="This market keeps trading between oracle prints — the order book leads the price. The external feed re-anchors the oracle at the next scheduled session.">live</span>
+                      <span className="text-muted ml-1.5">book-led · next oracle {fmtNextOracle(nextOracleAt, nowTick)}</span>
+                    </>
                   ) : (
-                    <span className="text-muted">market closed — self-priced overnight · {market.chainSymbol}</span>
+                    <span className="text-muted">self-priced · order book</span>
                   )}
                 </div>
               ) : (

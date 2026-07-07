@@ -21,6 +21,10 @@ export interface ChainMarket {
   markPrice: number
   updatedAt: string
   priceSource: ChainPriceSource | null
+  // epoch ms of the next scheduled oracle print (scheduled feeds like
+  // dramexchange); null for self-oracled / continuous feeds. The book keeps
+  // trading between prints, so the UI shows "book-led · next oracle …".
+  nextOracleAt: number | null
 }
 
 export async function GET() {
@@ -34,7 +38,7 @@ export async function GET() {
       // provenance without reaching into `meta`. /v0 nests it under meta.
       return {
         body: {
-          markets: data.map((m) => ({ ...m, name: m.symbol, priceSource: m.priceSource ?? m.meta?.priceSource ?? null })),
+          markets: data.map((m) => ({ ...m, name: m.symbol, priceSource: m.priceSource ?? m.meta?.priceSource ?? null, nextOracleAt: m.nextOracleAt ?? null })),
         },
         status: 200,
       }
