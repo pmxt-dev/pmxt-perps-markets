@@ -9,7 +9,7 @@ import { Footer } from '@/components/Footer'
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 const sans = Inter({ subsets: ['latin'], variable: '--font-sans' })
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pmxt-perps-markets.vercel.app'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.perpify.io'
 const SITE_NAME = 'pmxt·perps'
 const SITE_DESCRIPTION = 'Trade perp markets on-chain. Permissionless. USDC settled.'
 

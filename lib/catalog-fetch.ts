@@ -26,3 +26,20 @@ export async function fetchMarketById(id: string, revalidateSeconds = 60): Promi
   const markets = await fetchCatalog(revalidateSeconds)
   return markets.find((m) => m.name.toLowerCase() === lc) ?? null
 }
+
+// recent mark-price series (candle closes) for a market — used to draw the
+// price plot into the OG share image. Returns [] on failure / no history.
+export async function fetchPriceSeries(symbol: string, limit = 150, revalidateSeconds = 60): Promise<number[]> {
+  try {
+    const res = await fetch(
+      `${CHAIN_MARKETS_API}/v0/markets/${encodeURIComponent(symbol)}/candles?interval=1m&limit=${limit}`,
+      { next: { revalidate: revalidateSeconds } },
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    if (!Array.isArray(data)) return []
+    return (data as Array<{ c: number }>).map((k) => Number(k.c)).filter((n) => Number.isFinite(n) && n > 0)
+  } catch {
+    return []
+  }
+}

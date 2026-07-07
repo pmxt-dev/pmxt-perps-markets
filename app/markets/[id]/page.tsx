@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { fetchCatalog, fetchMarketById } from '@/lib/catalog-fetch'
 import MarketDetailClient from '@/components/MarketDetailClient'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pmxt-perps-markets.vercel.app'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.perpify.io'
 
 interface PageProps {
   params: Promise<{ id: string }>

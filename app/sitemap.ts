@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { fetchCatalog } from '@/lib/catalog-fetch'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pmxt-perps-markets.vercel.app'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.perpify.io'
 
 export const revalidate = 300
 
