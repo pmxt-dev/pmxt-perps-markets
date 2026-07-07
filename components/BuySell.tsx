@@ -53,6 +53,7 @@ export default function BuySell({ symbol, price, book }: BuySellProps) {
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [amountStr, setAmountStr] = useState('')
   const [limitPriceStr, setLimitPriceStr] = useState('')
+  const [depositStr, setDepositStr] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<AccountInfo | null>(null)
@@ -80,21 +81,34 @@ export default function BuySell({ symbol, price, book }: BuySellProps) {
     return signature
   }
 
+  const isMainnet = process.env.NEXT_PUBLIC_NETWORK === 'mainnet'
+  const walletUsdc = info?.walletUsdc ?? 0
+  const depositAmt = parseFloat(depositStr) || 0
+
   const onFund = async () => {
     if (!publicKey) return
     setError(null)
     try {
-      // no faucet on mainnet — the user deposits their own real USDC
-      if (process.env.NEXT_PUBLIC_NETWORK !== 'mainnet') {
+      if (isMainnet) {
+        // real money: the user deposits a specific amount of their own USDC into
+        // their trading balance (no faucet). `setup` builds the create+deposit tx.
+        if (depositAmt <= 0) { setError('enter an amount to deposit'); return }
+        if (depositAmt > walletUsdc) { setError('amount exceeds your wallet USDC'); return }
+        setBusy('sign the deposit in your wallet…')
+        const { tx } = await tradeApi('setup', { owner: publicKey.toBase58(), amount: depositAmt })
+        await signAndSubmit(tx)
+      } else {
+        // devnet/local: faucet grants test USDC, then deposit the whole grant
         setBusy('requesting test funds…')
         await tradeApi('faucet', { owner: publicKey.toBase58() })
+        setBusy('sign the deposit in your wallet…')
+        const { tx } = await tradeApi('setup', { owner: publicKey.toBase58() })
+        await signAndSubmit(tx)
       }
-      setBusy('sign the deposit in your wallet…')
-      const { tx } = await tradeApi('setup', { owner: publicKey.toBase58() })
-      await signAndSubmit(tx)
+      setDepositStr('')
       refreshAccount()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'funding failed')
+      setError(e instanceof Error ? e.message : 'deposit failed')
     } finally {
       setBusy(null)
     }
@@ -145,6 +159,15 @@ export default function BuySell({ symbol, price, book }: BuySellProps) {
   const position = info?.account?.positions.find((p) => p.symbol === symbol)
   const positionSize = position ? Math.abs(position.baseUi) : 0
   const needsFunding = connected && (!info?.account || (tradable === 0 && !position))
+  // default the deposit to the full wallet balance, floored to cents so it can
+  // never round above the real balance (network fee is paid in SOL, not USDC)
+  const maxDeposit = Math.floor(walletUsdc * 100) / 100
+
+  useEffect(() => {
+    if (isMainnet && needsFunding && maxDeposit > 0 && depositStr === '') {
+      setDepositStr(maxDeposit.toFixed(2))
+    }
+  }, [isMainnet, needsFunding, maxDeposit, depositStr])
 
   return (
     <div className="font-mono flex flex-col gap-3">
@@ -311,13 +334,51 @@ export default function BuySell({ symbol, price, book }: BuySellProps) {
         >
           {isDemo ? 'START DEMO WALLET' : 'CONNECT WALLET'}
         </button>
+      ) : needsFunding && isMainnet ? (
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
+          <div className="flex items-center justify-between text-[11px] text-muted">
+            <span>fund your trading balance</span>
+            <span>wallet <span className="text-text">${walletUsdc.toFixed(2)}</span></span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-text">deposit</span>
+            <div className="relative shrink-0">
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-base font-semibold text-text">$</span>
+              <input
+                inputMode="decimal"
+                value={depositStr}
+                onChange={(e) => setDepositStr(e.target.value.replace(/[^0-9.]/g, ''))}
+                placeholder="0.00"
+                className="w-32 bg-bg border border-border rounded-md pl-7 pr-3 py-2 text-right text-base font-semibold text-text outline-none focus:border-muted"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={maxDeposit <= 0}
+              onClick={() => setDepositStr(maxDeposit.toFixed(2))}
+              className="text-[11px] px-2 py-1 rounded-md border border-border text-muted hover:text-text hover:border-muted transition disabled:opacity-30"
+            >
+              MAX
+            </button>
+          </div>
+          <button
+            onClick={onFund}
+            disabled={busy !== null || depositAmt <= 0 || depositAmt > walletUsdc}
+            className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed"
+          >
+            {busy ?? 'DEPOSIT USDC TO TRADE'}
+          </button>
+          <div className="text-[10px] text-muted">deposit USDC to fund your trading balance · needs a little SOL for the network fee</div>
+        </div>
       ) : needsFunding ? (
         <button
           onClick={onFund}
           disabled={busy !== null}
           className="w-full rounded-xl bg-accent/90 hover:bg-accent px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-50"
         >
-          {busy ?? (process.env.NEXT_PUBLIC_NETWORK === 'mainnet' ? 'DEPOSIT USDC' : 'GET $1,000 TEST USDC')}
+          {busy ?? 'GET $1,000 TEST USDC'}
         </button>
       ) : (
         <button
