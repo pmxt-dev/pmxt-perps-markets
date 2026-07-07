@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 import { JetBrains_Mono, Inter } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
 import { SolanaProvider } from '@/components/SolanaProvider'
 import { ConnectButton } from '@/components/ConnectButton'
 import { Footer } from '@/components/Footer'
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
           <Footer />
         </SolanaProvider>
+        <Analytics />
       </body>
     </html>
   )
