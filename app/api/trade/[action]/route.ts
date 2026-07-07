@@ -42,6 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ act
       res = await forward('/faucet', body)
     } else if (action === 'setup') {
       res = await forward('/tx/setup', body)
+    } else if (action === 'withdraw') {
+      res = await forward('/tx/withdraw', body)
     } else {
       return NextResponse.json({ error: 'unknown action' }, { status: 404 })
     }

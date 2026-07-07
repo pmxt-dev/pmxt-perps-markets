@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { JetBrains_Mono, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SolanaProvider } from '@/components/SolanaProvider'
-import { ConnectButton } from '@/components/ConnectButton'
+import { AccountMenu } from '@/components/AccountMenu'
 import { Footer } from '@/components/Footer'
 
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
@@ -89,7 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <a href="/docs" className="text-muted hover:text-text transition">docs</a>
               </nav>
               <div className="flex-1" />
-              <ConnectButton />
+              <AccountMenu />
             </div>
           </header>
           <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
