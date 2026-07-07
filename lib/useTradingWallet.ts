@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { PublicKey, Transaction } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
@@ -39,21 +39,6 @@ export function useTradingWallet(): TradingWallet {
   // disconnect), so the Phantom popup closes without connecting. Explicitly
   // connect once the user asked to and a wallet is selected. Guarded by
   // wantConnect so a manual disconnect never loop-reconnects.
-  const wantConnect = useRef(false)
-  const triedFor = useRef<unknown>(null)
-  useEffect(() => {
-    if (isDemoMode()) return
-    if (adapter.connected) { triedFor.current = null; return } // allow future reconnects
-    const w = adapter.wallet
-    // attempt at most ONCE per selection — never retry on failure (that loops
-    // "Unexpected error"). Surface the real wrapped cause, don't swallow it.
-    if (wantConnect.current && w && !adapter.connecting && triedFor.current !== w) {
-      triedFor.current = w
-      void adapter.connect().catch((e: any) => {
-        console.error('[wallet] connect failed:', e?.name, '—', e?.error ?? e?.message ?? e)
-      })
-    }
-  }, [adapter.wallet, adapter.connected, adapter.connecting])
 
   // Keypair.publicKey returns a NEW PublicKey object on every access, so reading
   // it inline gives consumers an unstable reference — their useCallback/useEffect
@@ -79,8 +64,8 @@ export function useTradingWallet(): TradingWallet {
     connected: adapter.connected,
     isDemo: false,
     signTransaction: adapter.signTransaction,
-    connect: () => { wantConnect.current = true; triedFor.current = null; setVisible(true) },
-    disconnect: () => { wantConnect.current = false; triedFor.current = null; void adapter.disconnect() },
+    connect: () => setVisible(true),
+    disconnect: () => { void adapter.disconnect() },
     reset: null,
   }
 }
