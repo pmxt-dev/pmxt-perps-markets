@@ -15,7 +15,6 @@ export function SolanaProvider({ children }: { children: React.ReactNode }) {
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider
         wallets={wallets}
-        autoConnect
         onError={(e) => console.error('[wallet]', e?.name ?? 'error', '—', (e as any)?.error ?? e?.message ?? String(e))}
       >
         <WalletModalProvider>{children}</WalletModalProvider>
