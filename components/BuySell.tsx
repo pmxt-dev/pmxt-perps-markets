@@ -168,7 +168,7 @@ export default function BuySell({ symbol, price }: BuySellProps) {
             isBuy ? 'bg-yes/15 border-yes text-yes' : 'border-border text-muted hover:text-text'
           }`}
         >
-          ▲ BUY
+          ▲ BUY / LONG
         </button>
         <button
           onClick={() => setSide('sell')}
@@ -176,7 +176,7 @@ export default function BuySell({ symbol, price }: BuySellProps) {
             !isBuy ? 'bg-no/15 border-no text-no' : 'border-border text-muted hover:text-text'
           }`}
         >
-          ▼ SELL
+          ▼ SELL / SHORT
         </button>
       </div>
 
@@ -264,6 +264,12 @@ export default function BuySell({ symbol, price }: BuySellProps) {
         </div>
       </div>
 
+      {contracts > 0 && (
+        <div className={`text-[11px] ${isBuy ? 'text-yes' : 'text-no'}`}>
+          → {isBuy ? 'long' : 'short'} {contracts.toFixed(2)} {symbol}{orderType === 'market' ? '' : ' (if filled)'}
+        </div>
+      )}
+
       {!connected ? (
         <button
           onClick={connect}
@@ -285,7 +291,7 @@ export default function BuySell({ symbol, price }: BuySellProps) {
           disabled={busy !== null || contracts <= 0 || (orderType === 'limit' && limitPrice <= 0)}
           className={`w-full rounded-xl ${theme.bg} px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed`}
         >
-          {busy ?? (isBuy ? `BUY ${symbol}` : `SELL ${symbol}`)}
+          {busy ?? (isBuy ? `LONG ${symbol}` : `SHORT ${symbol}`)}
         </button>
       )}
 
