@@ -9,24 +9,70 @@ const BG = '#0a0a0a'
 const GREEN = '#4ade80'
 const MUTED = '#8a8a8a'
 
+// mosaic ("boxplot") params — mirror components/Sparkline.tsx
+const COLS = 60
+const ROWS = 22
+const BAYER = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+]
+
 interface Props {
   params: { id: string }
 }
 
-// line + filled-area SVG paths for a price series scaled into WxH
-function plotPaths(series: number[], w: number, h: number): { line: string; area: string } | null {
-  if (series.length < 2) return null
-  const min = Math.min(...series)
-  const max = Math.max(...series)
-  const padY = h * 0.18
-  const span = max - min
-  const x = (i: number) => (i / (series.length - 1)) * w
-  const y = (p: number) => (span === 0 ? h * 0.5 : h - padY - ((p - min) / span) * (h - 2 * padY))
-  const pts = series.map((p, i) => `${x(i).toFixed(1)},${y(p).toFixed(1)}`)
-  return {
-    line: `M ${pts.join(' L ')}`,
-    area: `M ${x(0).toFixed(1)},${h} L ${pts.join(' L ')} L ${x(series.length - 1).toFixed(1)},${h} Z`,
+function sampleTo(data: number[], cols: number): number[] {
+  const out: number[] = []
+  for (let c = 0; c < cols; c++) {
+    const pos = (c / (cols - 1)) * (data.length - 1)
+    const idx = Math.floor(pos)
+    const frac = pos - idx
+    out.push(data[idx] * (1 - frac) + data[Math.min(idx + 1, data.length - 1)] * frac)
   }
+  return out
+}
+
+// the site's dithered block chart, rendered as subtle grey SVG rects filling WxH
+function mosaicRects(series: number[], w: number, h: number) {
+  if (series.length < 2) return null
+  const rawMin = Math.min(...series)
+  const rawMax = Math.max(...series)
+  const rawRange = rawMax - rawMin
+  const pad = rawRange > 0 ? rawRange * 0.15 : Math.abs(rawMax) * 0.5 || 1
+  const min = rawMin - pad
+  const range = rawMax + pad - min || 1
+  const sampled = sampleTo(series, COLS)
+  const cw = w / COLS
+  const ch = h / ROWS
+  const gap = 3
+  const rects: React.ReactNode[] = []
+  for (let c = 0; c < COLS; c++) {
+    const fillH = ((sampled[c] - min) / range) * (ROWS - 2) + 1
+    for (let r = 0; r < ROWS; r++) {
+      const threshold = (BAYER[c % 4][r % 4] + 0.5) / 16
+      let show = false
+      let opacity = 0.1 // faint grey base
+      if (r + 1 <= fillH) show = true
+      else if (r < fillH) { if (fillH - r > threshold) show = true }
+      else if (r < fillH + 1.5) { if (threshold < 0.35 - (r - fillH) * 0.3) { show = true; opacity = 0.05 } }
+      if (show) {
+        rects.push(
+          <rect
+            key={`${c}-${r}`}
+            x={c * cw + gap / 2}
+            y={h - (r + 1) * ch + gap / 2}
+            width={cw - gap}
+            height={ch - gap}
+            fill="#ffffff"
+            opacity={opacity}
+          />,
+        )
+      }
+    }
+  }
+  return rects
 }
 
 export default async function Image({ params }: Props) {
@@ -37,8 +83,7 @@ export default async function Image({ params }: Props) {
   const price = m ? `$${m.markPrice}` : null
   const category = m?.meta?.category ?? null
 
-  // full-bleed price plot behind the text — subtle grey, visible but not loud
-  const paths = plotPaths(series, size.width, size.height)
+  const rects = mosaicRects(series, size.width, size.height)
 
   return new ImageResponse(
     (
@@ -52,15 +97,14 @@ export default async function Image({ params }: Props) {
           fontFamily: 'monospace',
         }}
       >
-        {paths && (
+        {rects && (
           <svg
             width={size.width}
             height={size.height}
             viewBox={`0 0 ${size.width} ${size.height}`}
             style={{ position: 'absolute', top: 0, left: 0 }}
           >
-            <path d={paths.area} fill="#ffffff" fillOpacity={0.035} />
-            <path d={paths.line} fill="none" stroke="#4b5563" strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
+            {rects}
           </svg>
         )}
         <div
