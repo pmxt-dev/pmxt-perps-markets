@@ -182,14 +182,14 @@ export default function Home() {
         </div>
 
         <div className="border border-border rounded-xl bg-panel overflow-hidden font-mono">
-          <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
+          <h2 className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
             // {selectedCategory === 'All' ? 'all markets' : selectedCategory.toLowerCase()} ({filteredMarkets.length})
             {chainError && (
               <span className="ml-3 normal-case tracking-normal text-no">
                 ✗ chain feed: {chainError} — onchain prices may be stale
               </span>
             )}
-          </div>
+          </h2>
           <div className="divide-y divide-border/50">
             {filteredMarkets.map((market) => {
               const quote = live[market.id]
@@ -206,7 +206,13 @@ export default function Home() {
                   <div className="min-w-0 flex-1 flex items-center gap-2.5">
                     {market.thumbnail && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={market.thumbnail} alt="" className="w-6 h-6 rounded-md object-cover shrink-0" />
+                      <img
+                        src={market.thumbnail}
+                        alt={market.symbol}
+                        width={24}
+                        height={24}
+                        className="w-6 h-6 rounded-md object-cover shrink-0"
+                      />
                     )}
                     <div className="min-w-0">
                       <div className="text-text text-sm">{market.symbol}</div>
@@ -416,9 +422,9 @@ function CreateMarket() {
 
   return (
     <aside className="border border-border rounded-xl bg-panel overflow-hidden font-mono sticky top-20">
-      <div className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
+      <h2 className="px-4 py-3 border-b border-border text-xs text-muted uppercase tracking-widest">
         // create market
-      </div>
+      </h2>
       <div className="p-4 flex flex-col gap-4 text-xs">
         <Field label="market name">
           <input

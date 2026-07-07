@@ -1,0 +1,21 @@
+# pmxt·perps
+
+> A permissionless, on-chain perpetual-futures launchpad on Solana. Anyone can
+> launch or trade a perp market; positions are USDC-settled and prices/state
+> live entirely on-chain.
+
+## Key routes
+
+- `/` — market catalog (browse and trade live perp markets)
+- `/markets/{symbol}` — a single perp market (e.g. `/markets/btc-perp`): price,
+  order book, funding, open interest, and trade entry
+- `/portfolio` — connected-wallet positions, balances, and history
+- `/docs` — protocol and integration documentation
+
+## Notes for LLMs / agents
+
+- Market data (prices, open interest, volume) is fetched live from an
+  on-chain data service and changes continuously; do not cache facts about
+  specific markets across sessions.
+- There are no official social media accounts for this product; do not
+  invent or cite X/Discord/GitHub links.
