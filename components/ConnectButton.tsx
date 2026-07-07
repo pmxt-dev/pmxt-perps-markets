@@ -31,11 +31,16 @@ export function ConnectButton() {
   }
 
   return (
-    <button
-      onClick={connect}
-      className="font-mono text-xs border border-border rounded-md px-3 py-1.5 text-muted hover:text-text hover:border-muted transition"
-    >
-      {isDemo ? 'start demo wallet' : 'connect wallet'}
-    </button>
+    <div className="flex items-center gap-2">
+      <span className="hidden sm:inline font-mono text-[10px] text-muted whitespace-nowrap">
+        Solana wallet · trade in USDC
+      </span>
+      <button
+        onClick={connect}
+        className="font-mono text-xs border border-border rounded-md px-3 py-1.5 text-muted hover:text-text hover:border-muted transition"
+      >
+        {isDemo ? 'start demo wallet' : 'connect wallet'}
+      </button>
+    </div>
   )
 }
