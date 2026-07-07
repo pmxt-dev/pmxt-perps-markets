@@ -24,7 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]
 
   const marketEntries: MetadataRoute.Sitemap = markets.map((m) => ({
-    url: `${SITE_URL}/markets/${m.name.toLowerCase()}`,
+    url: `${SITE_URL}/perps/${m.name.toLowerCase()}`,
     lastModified: new Date(),
     changeFrequency: 'hourly',
     priority: 0.8,

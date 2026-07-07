@@ -10,6 +10,15 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/markets/:id',
+        destination: '/perps/:id',
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {

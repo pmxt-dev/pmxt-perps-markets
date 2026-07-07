@@ -200,7 +200,7 @@ export default function Home() {
               return (
                 <Link
                   key={market.id}
-                  href={`/markets/${market.id}`}
+                  href={`/perps/${market.id}`}
                   className="flex items-center gap-4 px-4 py-3 text-xs hover:bg-white/[0.03] transition"
                 >
                   <div className="min-w-0 flex-1 flex items-center gap-2.5">

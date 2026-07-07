@@ -244,7 +244,7 @@ export default function Portfolio() {
                   </>
                 )
                 return id
-                  ? <Link key={p.symbol} href={`/markets/${id}`} className="flex px-4 py-2.5 hover:bg-white/[0.03] transition">{row}</Link>
+                  ? <Link key={p.symbol} href={`/perps/${id}`} className="flex px-4 py-2.5 hover:bg-white/[0.03] transition">{row}</Link>
                   : <div key={p.symbol} className="flex px-4 py-2.5">{row}</div>
               })}
             </div>
@@ -337,7 +337,7 @@ export default function Portfolio() {
               </div>
               {myMarkets.map(m => (
                 <div key={m.symbol} className="flex items-center px-4 py-2.5">
-                  <Link href={`/markets/${m.symbol.toLowerCase()}`} className="flex-1 text-text hover:text-accent transition">{m.symbol}</Link>
+                  <Link href={`/perps/${m.symbol.toLowerCase()}`} className="flex-1 text-text hover:text-accent transition">{m.symbol}</Link>
                   <span className="w-20 text-right text-muted">{m.creatorBps} bps</span>
                   <span className="w-28 text-right text-muted hidden sm:block">${fmtPrice(m.accruedUsd)}</span>
                   <span className={`w-28 text-right ${m.creatorClaimableUsd > 0 ? 'text-yes' : 'text-muted'}`}>${fmtPrice(m.creatorClaimableUsd)}</span>

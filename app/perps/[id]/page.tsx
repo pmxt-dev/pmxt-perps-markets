@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = `${m.name} — pmxt·perps`
   const description =
     m.meta?.description || `Trade ${m.name} perpetual futures on-chain, permissionless, USDC-settled.`
-  const url = `/markets/${id}`
+  const url = `/perps/${id}`
 
   return {
     title,
@@ -34,13 +34,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description,
       url,
-      images: [`/markets/${id}/opengraph-image`],
+      images: [`/perps/${id}/opengraph-image`],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: [`/markets/${id}/opengraph-image`],
+      images: [`/perps/${id}/opengraph-image`],
     },
   }
 }
@@ -66,7 +66,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
           description: m.meta?.description || `${m.name} perpetual futures on the pmxt chain.`,
           category: m.meta?.category ?? undefined,
           image: m.meta?.thumbnail ?? undefined,
-          url: `${SITE_URL}/markets/${id}`,
+          url: `${SITE_URL}/perps/${id}`,
           brand: {
             '@type': 'Organization',
             name: 'pmxt·perps',
@@ -76,7 +76,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
             price: String(m.markPrice),
             priceCurrency: 'USD',
             availability: 'https://schema.org/InStock',
-            url: `${SITE_URL}/markets/${id}`,
+            url: `${SITE_URL}/perps/${id}`,
           },
         },
         {
@@ -85,7 +85,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
           itemListElement: [
             { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
             { '@type': 'ListItem', position: 2, name: 'Markets', item: `${SITE_URL}/` },
-            { '@type': 'ListItem', position: 3, name: m.name, item: `${SITE_URL}/markets/${id}` },
+            { '@type': 'ListItem', position: 3, name: m.name, item: `${SITE_URL}/perps/${id}` },
           ],
         },
       ]
