@@ -144,6 +144,11 @@ export default async function Image({ params }: Props) {
         </div>
       </div>
     ),
-    { ...size },
+    {
+      ...size,
+      // the card shows a live price, so don't let it cache immutably for a year
+      // (next/og's default). Refresh every ~5 min; stale-serve while revalidating.
+      headers: { 'cache-control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=600' },
+    },
   )
 }
