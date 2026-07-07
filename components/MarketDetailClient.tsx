@@ -368,8 +368,34 @@ function MetaRow({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+// upstream price feed (provenance) — mirrors exchange-core's PriceSource union.
+type PriceSource =
+  | { type: 'yahoo'; ticker: string }
+  | { type: 'http'; url: string; path: string; headers?: Record<string, string> }
+  | { type: 'dramexchange'; product?: string }
+  | { type: 'self' }
+
+// map an upstream price feed to a human label + optional external link. Returns
+// href: null for self-priced / unknown feeds (rendered as plain muted text).
+function sourceLink(ps: PriceSource | null | undefined): { label: string; href: string | null } {
+  switch (ps?.type) {
+    case 'dramexchange':
+      return { label: 'DRAMeXchange', href: 'https://www.dramexchange.com/#dram-spot-price' }
+    case 'yahoo':
+      return { label: 'Yahoo Finance', href: `https://finance.yahoo.com/quote/${ps.ticker}` }
+    case 'http':
+      try {
+        return { label: new URL(ps.url).hostname, href: ps.url }
+      } catch {
+        return { label: ps.url, href: ps.url }
+      }
+    default:
+      return { label: 'order book (self-priced)', href: null }
+  }
+}
+
 function MarketMeta({ chainSymbol }: { chainSymbol: string }) {
-  const [d, setD] = useState<{ oracle?: string; feeBps?: number; creator?: string; creatorBps?: number; protocolBps?: number; selfOracled?: boolean } | null>(null)
+  const [d, setD] = useState<{ oracle?: string; feeBps?: number; creator?: string; creatorBps?: number; protocolBps?: number; selfOracled?: boolean; priceSource?: PriceSource | null } | null>(null)
   useEffect(() => {
     let off = false
     Promise.all([
@@ -379,7 +405,13 @@ function MarketMeta({ chainSymbol }: { chainSymbol: string }) {
       if (off) return
       const m = cm?.markets?.find((x: { name: string }) => x.name === chainSymbol)
       const f = fees?.markets?.find((x: { symbol: string }) => x.symbol === chainSymbol)
-      setD({ oracle: m?.oracle, feeBps: m?.feeBps, creator: f?.creator, creatorBps: f?.creatorBps, protocolBps: f?.protocolBps, selfOracled: m?.selfOracled })
+      // top-level priceSource (lifted by the chain-markets route); fall back to
+      // the nested meta shape or the legacy selfOracled/sourceTicker signals.
+      const priceSource: PriceSource | null =
+        m?.priceSource ??
+        m?.meta?.priceSource ??
+        (m?.selfOracled ? { type: 'self' } : m?.sourceTicker ? { type: 'yahoo', ticker: m.sourceTicker } : null)
+      setD({ oracle: m?.oracle, feeBps: m?.feeBps, creator: f?.creator, creatorBps: f?.creatorBps, protocolBps: f?.protocolBps, selfOracled: m?.selfOracled, priceSource })
     })
     return () => { off = true }
   }, [chainSymbol])
@@ -408,6 +440,20 @@ function MarketMeta({ chainSymbol }: { chainSymbol: string }) {
         <MetaRow label="oracle">
           {d.oracle ? <a href={ex(d.oracle)} target="_blank" rel="noreferrer" className="text-accent hover:underline">{trunc(d.oracle)}</a> : '—'}
         </MetaRow>
+        {(() => {
+          const src = sourceLink(d.priceSource)
+          return (
+            <MetaRow label="source">
+              {src.href ? (
+                <a href={src.href} target="_blank" rel="noreferrer" className="text-accent hover:underline" title="Upstream price feed this market tracks.">
+                  {src.label} <span className="opacity-70">↗</span>
+                </a>
+              ) : (
+                <span className="text-muted" title="No external feed — priced by this market's own order book.">{src.label}</span>
+              )}
+            </MetaRow>
+          )
+        })()}
         <MetaRow label="creator">
           {d.creator ? <a href={ex(d.creator)} target="_blank" rel="noreferrer" className="text-accent hover:underline">{trunc(d.creator)}</a> : '—'}
         </MetaRow>
