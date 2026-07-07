@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { PublicKey, Transaction } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
@@ -34,6 +34,19 @@ export function useTradingWallet(): TradingWallet {
     if (hasBurner()) startBurner() // auto-connect an existing burner
   }, [])
 
+  // The modal only *selects* a wallet; with wallet-standard adapters autoConnect
+  // doesn't reliably fire on a fresh manual pick (especially right after a
+  // disconnect), so the Phantom popup closes without connecting. Explicitly
+  // connect once the user asked to and a wallet is selected. Guarded by
+  // wantConnect so a manual disconnect never loop-reconnects.
+  const wantConnect = useRef(false)
+  useEffect(() => {
+    if (isDemoMode()) return
+    if (wantConnect.current && adapter.wallet && !adapter.connected && !adapter.connecting) {
+      void adapter.connect().catch(() => { /* user rejected / not ready — no-op */ })
+    }
+  }, [adapter.wallet, adapter.connected, adapter.connecting])
+
   // Keypair.publicKey returns a NEW PublicKey object on every access, so reading
   // it inline gives consumers an unstable reference — their useCallback/useEffect
   // deps then churn every render (this caused the portfolio to loop-fetch and
@@ -58,8 +71,8 @@ export function useTradingWallet(): TradingWallet {
     connected: adapter.connected,
     isDemo: false,
     signTransaction: adapter.signTransaction,
-    connect: () => setVisible(true),
-    disconnect: () => { void adapter.disconnect() },
+    connect: () => { wantConnect.current = true; setVisible(true) },
+    disconnect: () => { wantConnect.current = false; void adapter.disconnect() },
     reset: null,
   }
 }
