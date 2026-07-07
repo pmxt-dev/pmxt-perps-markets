@@ -136,7 +136,7 @@ export function AccountMenu() {
             </div>
             <div className="flex items-center justify-between text-[10px]">
               <span className="text-muted">SOL (for fees)</span>
-              <span className={sol < 0.01 ? 'text-no' : 'text-muted'}>{sol.toFixed(3)}</span>
+              <span className={sol < 0.03 ? 'text-no' : 'text-muted'}>{sol.toFixed(3)}</span>
             </div>
           </div>
 
@@ -181,6 +181,12 @@ export function AccountMenu() {
               ? 'moves USDC from your wallet into your trading balance so you can trade'
               : 'moves USDC from your trading balance back to your wallet'}
           </div>
+
+          {tab === 'deposit' && !info?.account && sol < 0.03 && (
+            <div className="text-[11px] text-no mb-2">
+              first deposit creates your trading account (~0.03 SOL) — you have {sol.toFixed(3)}, top up SOL first
+            </div>
+          )}
 
           {error && <div className="text-[11px] text-no mb-2">{error}</div>}
 

@@ -43,8 +43,14 @@ async function tradeApi(action: string, body: unknown): Promise<any> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : `${action} failed`)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const e = data?.error
+    const msg = typeof e === 'string' ? e
+      : (e && typeof e.message === 'string') ? e.message
+      : `${action} failed (no error detail returned)`
+    throw new Error(msg)
+  }
   return data
 }
 

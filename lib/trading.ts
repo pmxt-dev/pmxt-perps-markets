@@ -20,14 +20,30 @@ const bytesToB64 = (bytes: Uint8Array) => {
   return btoa(s)
 }
 
+// The chain API has two error envelopes: markets_api → { error: "msg" },
+// v0_api → { error: { code, message } }. Never swallow either — surface the real
+// message so failures are legible, not a generic "<action> failed".
+export function errMessage(data: any, action: string): string {
+  const e = data?.error
+  if (typeof e === 'string') return e
+  if (e && typeof e.message === 'string') return e.message
+  if (typeof data?.message === 'string') return data.message
+  return `${action} failed (no error detail returned)`
+}
+
 export async function tradeApi(action: string, body: unknown): Promise<any> {
-  const res = await fetch(`/api/trade/${action}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : `${action} failed`)
+  let res: Response
+  try {
+    res = await fetch(`/api/trade/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (e) {
+    throw new Error(`${action}: network error — ${e instanceof Error ? e.message : 'request failed'}`)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(errMessage(data, action))
   return data
 }
 
