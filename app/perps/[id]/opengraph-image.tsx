@@ -5,105 +5,140 @@ export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 export const alt = 'pmxt·perps market'
 
-const BG = '#000000'
-const UP = '#00d68f'
-const DOWN = '#ff5c5c'
+const BG = '#0a0a0a'
+const GREEN = '#4ade80'
 const MUTED = '#8a8a8a'
 
+// mosaic ("boxplot") params — mirror components/Sparkline.tsx
+const COLS = 60
+const ROWS = 22
+const BAYER = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+]
+
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-// build the line + filled-area SVG paths for a price series scaled into WxH
-function plotPaths(series: number[], w: number, h: number): { line: string; area: string } | null {
+function sampleTo(data: number[], cols: number): number[] {
+  const out: number[] = []
+  for (let c = 0; c < cols; c++) {
+    const pos = (c / (cols - 1)) * (data.length - 1)
+    const idx = Math.floor(pos)
+    const frac = pos - idx
+    out.push(data[idx] * (1 - frac) + data[Math.min(idx + 1, data.length - 1)] * frac)
+  }
+  return out
+}
+
+// the site's dithered block chart, rendered as subtle grey SVG rects filling WxH
+function mosaicRects(series: number[], w: number, h: number) {
   if (series.length < 2) return null
-  const min = Math.min(...series)
-  const max = Math.max(...series)
-  const padY = h * 0.12
-  const span = max - min
-  const x = (i: number) => (i / (series.length - 1)) * w
-  const y = (p: number) => (span === 0 ? h / 2 : h - padY - ((p - min) / span) * (h - 2 * padY))
-  const pts = series.map((p, i) => `${x(i).toFixed(1)},${y(p).toFixed(1)}`)
-  const line = `M ${pts.join(' L ')}`
-  const area = `M ${x(0).toFixed(1)},${h} L ${pts.join(' L ')} L ${x(series.length - 1).toFixed(1)},${h} Z`
-  return { line, area }
-}
-
-// format a price without float noise (mirrors the app's fmtPrice intent)
-function fmtPrice(p: number): string {
-  if (p >= 1) return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return p.toLocaleString('en-US', { minimumSignificantDigits: 3, maximumSignificantDigits: 4 })
+  const rawMin = Math.min(...series)
+  const rawMax = Math.max(...series)
+  const rawRange = rawMax - rawMin
+  const pad = rawRange > 0 ? rawRange * 0.15 : Math.abs(rawMax) * 0.5 || 1
+  const min = rawMin - pad
+  const range = rawMax + pad - min || 1
+  const sampled = sampleTo(series, COLS)
+  const cw = w / COLS
+  const ch = h / ROWS
+  const gap = 3
+  const rects: React.ReactNode[] = []
+  for (let c = 0; c < COLS; c++) {
+    const fillH = ((sampled[c] - min) / range) * (ROWS - 2) + 1
+    for (let r = 0; r < ROWS; r++) {
+      const threshold = (BAYER[c % 4][r % 4] + 0.5) / 16
+      let show = false
+      let opacity = 0.1 // faint grey base
+      if (r + 1 <= fillH) show = true
+      else if (r < fillH) { if (fillH - r > threshold) show = true }
+      else if (r < fillH + 1.5) { if (threshold < 0.35 - (r - fillH) * 0.3) { show = true; opacity = 0.05 } }
+      if (show) {
+        rects.push(
+          <rect
+            key={`${c}-${r}`}
+            x={c * cw + gap / 2}
+            y={h - (r + 1) * ch + gap / 2}
+            width={cw - gap}
+            height={ch - gap}
+            fill="#ffffff"
+            opacity={opacity}
+          />,
+        )
+      }
+    }
+  }
+  return rects
 }
 
 export default async function Image({ params }: Props) {
-  const m = await fetchMarketById(params.id)
+  const { id } = await params
+  const m = await fetchMarketById(id)
   const series = m ? await fetchPriceSeries(m.name) : []
 
   const symbol = m?.name ?? 'pmxt·perps'
+  const price = m ? `$${m.markPrice}` : null
   const category = m?.meta?.category ?? null
-  const last = series.length ? series[series.length - 1] : m?.markPrice ?? null
-  const first = series.length ? series[0] : null
-  const changePct = first && last ? ((last - first) / first) * 100 : null
-  const up = changePct === null ? true : changePct >= 0
-  const color = up ? UP : DOWN
 
-  const W = 1072 // 1200 - 2*64
-  const PLOT_H = 300
-  const paths = plotPaths(series, W, PLOT_H)
+  // the site's boxplot chart, faint grey, full-bleed behind the text
+  const rects = mosaicRects(series, size.width, size.height)
 
   return new ImageResponse(
     (
       <div
         style={{
+          position: 'relative',
           width: '100%',
           height: '100%',
           display: 'flex',
-          flexDirection: 'column',
           backgroundColor: BG,
-          padding: '64px',
           fontFamily: 'monospace',
         }}
       >
-        {/* header: symbol/category (left) + price/change (right) */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', fontSize: 26, color: MUTED, letterSpacing: 4, textTransform: 'uppercase' }}>
-              pmxt·perps
-            </div>
-            <div style={{ display: 'flex', fontSize: 92, color: '#ffffff', fontWeight: 700, marginTop: 12 }}>
-              {symbol}
-            </div>
-            {category && (
-              <div style={{ display: 'flex', fontSize: 26, color: MUTED, marginTop: 8, textTransform: 'uppercase', letterSpacing: 2 }}>
-                {category}
-              </div>
-            )}
+        {rects && (
+          <svg
+            width={size.width}
+            height={size.height}
+            viewBox={`0 0 ${size.width} ${size.height}`}
+            style={{ position: 'absolute', top: 0, left: 0 }}
+          >
+            {rects}
+          </svg>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%',
+            padding: '80px',
+          }}
+        >
+          <div style={{ display: 'flex', fontSize: 28, color: MUTED, letterSpacing: 4, textTransform: 'uppercase' }}>
+            pmxt·perps
           </div>
-          {last !== null && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <div style={{ display: 'flex', fontSize: 68, color, fontWeight: 700 }}>${fmtPrice(last)}</div>
-              {changePct !== null && (
-                <div style={{ display: 'flex', alignItems: 'center', fontSize: 40, color, marginTop: 8 }}>
-                  <svg width={28} height={28} viewBox="0 0 10 10" style={{ marginRight: 10 }}>
-                    <path d={up ? 'M5 1 L9 9 L1 9 Z' : 'M1 1 L9 1 L5 9 Z'} fill={color} />
-                  </svg>
-                  {up ? '+' : ''}{changePct.toFixed(2)}%
-                </div>
-              )}
+          <div style={{ display: 'flex', fontSize: 96, color: '#ffffff', fontWeight: 700, marginTop: 24 }}>
+            {symbol}
+          </div>
+          {price && (
+            <div style={{ display: 'flex', fontSize: 56, color: GREEN, marginTop: 16 }}>
+              {price}
             </div>
           )}
-        </div>
-
-        {/* the actual price plot */}
-        <div style={{ display: 'flex', flexGrow: 1, alignItems: 'flex-end' }}>
-          {paths ? (
-            <svg width={W} height={PLOT_H} viewBox={`0 0 ${W} ${PLOT_H}`} style={{ display: 'block' }}>
-              <path d={paths.area} fill={color} fillOpacity={0.14} />
-              <path d={paths.line} fill="none" stroke={color} strokeWidth={5} strokeLinejoin="round" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <div style={{ display: 'flex', fontSize: 30, color: MUTED }}>
-              {m ? 'no trades yet — be the first' : 'permissionless perpetual futures, on-chain'}
+          {category && (
+            <div style={{ display: 'flex', fontSize: 28, color: MUTED, marginTop: 24, textTransform: 'uppercase', letterSpacing: 2 }}>
+              {category}
+            </div>
+          )}
+          {!m && (
+            <div style={{ display: 'flex', fontSize: 32, color: MUTED, marginTop: 24 }}>
+              permissionless perpetual futures, on-chain
             </div>
           )}
         </div>
