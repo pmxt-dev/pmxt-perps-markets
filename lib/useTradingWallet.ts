@@ -40,10 +40,18 @@ export function useTradingWallet(): TradingWallet {
   // connect once the user asked to and a wallet is selected. Guarded by
   // wantConnect so a manual disconnect never loop-reconnects.
   const wantConnect = useRef(false)
+  const triedFor = useRef<unknown>(null)
   useEffect(() => {
     if (isDemoMode()) return
-    if (wantConnect.current && adapter.wallet && !adapter.connected && !adapter.connecting) {
-      void adapter.connect().catch(() => { /* user rejected / not ready — no-op */ })
+    if (adapter.connected) { triedFor.current = null; return } // allow future reconnects
+    const w = adapter.wallet
+    // attempt at most ONCE per selection — never retry on failure (that loops
+    // "Unexpected error"). Surface the real wrapped cause, don't swallow it.
+    if (wantConnect.current && w && !adapter.connecting && triedFor.current !== w) {
+      triedFor.current = w
+      void adapter.connect().catch((e: any) => {
+        console.error('[wallet] connect failed:', e?.name, '—', e?.error ?? e?.message ?? e)
+      })
     }
   }, [adapter.wallet, adapter.connected, adapter.connecting])
 
@@ -71,8 +79,8 @@ export function useTradingWallet(): TradingWallet {
     connected: adapter.connected,
     isDemo: false,
     signTransaction: adapter.signTransaction,
-    connect: () => { wantConnect.current = true; setVisible(true) },
-    disconnect: () => { wantConnect.current = false; void adapter.disconnect() },
+    connect: () => { wantConnect.current = true; triedFor.current = null; setVisible(true) },
+    disconnect: () => { wantConnect.current = false; triedFor.current = null; void adapter.disconnect() },
     reset: null,
   }
 }
