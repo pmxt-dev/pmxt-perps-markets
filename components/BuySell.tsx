@@ -5,6 +5,7 @@ import { Transaction } from '@solana/web3.js'
 import confetti from 'canvas-confetti'
 import { fmtPrice } from '@/lib/format'
 import { useTradingWallet } from '@/lib/useTradingWallet'
+import type { BookData } from '@/components/OrderBook'
 
 // Real trading ticket: the chain API builds unsigned txs, the wallet signs,
 // /api/trade/submit relays to the validator. Orders land in the same book
@@ -12,6 +13,7 @@ import { useTradingWallet } from '@/lib/useTradingWallet'
 interface BuySellProps {
   symbol: string
   price: number
+  book?: BookData | null
 }
 
 interface AccountInfo {
@@ -46,7 +48,7 @@ async function tradeApi(action: string, body: unknown): Promise<any> {
   return data
 }
 
-export default function BuySell({ symbol, price }: BuySellProps) {
+export default function BuySell({ symbol, price, book }: BuySellProps) {
   const [side, setSide] = useState<'buy' | 'sell'>('buy')
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [amountStr, setAmountStr] = useState('')
@@ -106,6 +108,9 @@ export default function BuySell({ symbol, price }: BuySellProps) {
   const amountNum = parseFloat(amountStr) || 0
   const contracts = isBuy ? (effPrice > 0 ? amountNum / effPrice : 0) : amountNum
   const notional = contracts * effPrice
+  // touch prices for limit-order context (best bid / best ask)
+  const bestBid = book?.bids?.length ? Math.max(...book.bids.map((l) => l.price)) : null
+  const bestAsk = book?.asks?.length ? Math.min(...book.asks.map((l) => l.price)) : null
 
   const onTrade = async () => {
     if (!publicKey) return
@@ -197,17 +202,44 @@ export default function BuySell({ symbol, price }: BuySellProps) {
       )}
 
       {orderType === 'limit' && (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-text">limit price</span>
-          <div className="relative shrink-0">
-            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-base font-semibold text-text">$</span>
-            <input
-              inputMode="decimal"
-              value={limitPriceStr}
-              onChange={(e) => setLimitPriceStr(e.target.value.replace(/[^0-9.]/g, ''))}
-              placeholder={fmtPrice(price)}
-              className="w-32 bg-bg border border-border rounded-md pl-7 pr-3 py-2 text-right text-base font-semibold text-text outline-none focus:border-muted"
-            />
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-text">limit price</span>
+            <div className="relative shrink-0">
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-base font-semibold text-text">$</span>
+              <input
+                inputMode="decimal"
+                value={limitPriceStr}
+                onChange={(e) => setLimitPriceStr(e.target.value.replace(/[^0-9.]/g, ''))}
+                placeholder={fmtPrice(price)}
+                className="w-32 bg-bg border border-border rounded-md pl-7 pr-3 py-2 text-right text-base font-semibold text-text outline-none focus:border-muted"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-muted">
+            <span>rests as maker · cancel anytime</span>
+            {(bestBid !== null || bestAsk !== null) && (
+              <span className="tabular-nums">
+                bid{' '}
+                <button
+                  type="button"
+                  disabled={bestBid === null}
+                  onClick={() => bestBid !== null && setLimitPriceStr(String(bestBid))}
+                  className="text-yes hover:underline disabled:no-underline"
+                >
+                  ${bestBid !== null ? fmtPrice(bestBid) : '—'}
+                </button>
+                {' · ask '}
+                <button
+                  type="button"
+                  disabled={bestAsk === null}
+                  onClick={() => bestAsk !== null && setLimitPriceStr(String(bestAsk))}
+                  className="text-no hover:underline disabled:no-underline"
+                >
+                  ${bestAsk !== null ? fmtPrice(bestAsk) : '—'}
+                </button>
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -266,7 +298,9 @@ export default function BuySell({ symbol, price }: BuySellProps) {
 
       {contracts > 0 && (
         <div className={`text-[11px] ${isBuy ? 'text-yes' : 'text-no'}`}>
-          → {isBuy ? 'long' : 'short'} {contracts.toFixed(2)} {symbol}{orderType === 'market' ? '' : ' (if filled)'}
+          {orderType === 'market'
+            ? `→ ${isBuy ? 'long' : 'short'} ${contracts.toFixed(2)} ${symbol}`
+            : `→ rest ${contracts.toFixed(2)} ${symbol} @ $${fmtPrice(effPrice)} · maker`}
         </div>
       )}
 

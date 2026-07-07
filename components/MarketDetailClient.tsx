@@ -347,7 +347,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
 
         <div className="md:col-span-1 flex flex-col gap-6">
           <div className="border border-border rounded-xl bg-panel p-4">
-            <BuySell symbol={market.symbol} price={markPrice} />
+            <BuySell symbol={market.symbol} price={markPrice} book={book} />
           </div>
           {chainSymbol && <MarketMeta chainSymbol={chainSymbol} />}
           {chainSymbol && <CreatorFees chainSymbol={chainSymbol} />}
