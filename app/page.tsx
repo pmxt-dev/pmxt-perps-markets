@@ -31,7 +31,6 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All')
   const [live, setLive] = useState<Record<string, LiveQuote>>({})
   const [extra, setExtra] = useState<Market[]>([])
-  const [liquidity, setLiquidity] = useState<Record<string, number>>({})
   const [chainError, setChainError] = useState<string | null>(null)
 
   // list must show the same live price the detail page shows — mock values only remain
@@ -101,27 +100,14 @@ export default function Home() {
         .catch(e => {
           if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
         })
-      // resting liquidity per market
-      fetch('/api/chain-liquidity')
-        .then(async r => {
-          const d = await r.json()
-          if (cancelled || !r.ok || typeof d.liquidity !== 'object' || d.liquidity === null) return
-          setLiquidity(d.liquidity)
-        })
-        .catch(() => {})
-      // full catalog — surfaces markets deployed at runtime, and carries
-      // liquidity for every on-chain market (static + deployed)
+      // full catalog — surfaces markets deployed at runtime (volume/liquidity
+      // travel on each entry via catalogToMarket)
       fetch('/api/catalog')
         .then(async r => {
           const d = await r.json()
           if (cancelled || !r.ok || !Array.isArray(d.markets)) return
           const entries = d.markets as CatalogEntry[]
           setExtra(entries.map(catalogToMarket))
-          setLiquidity(prev => {
-            const next = { ...prev }
-            for (const m of entries) next[m.name.toLowerCase()] = m.liquidityUsd
-            return next
-          })
           // sparkline for every on-chain market (incl. deployed) from its history
           for (const m of entries) {
             const id = m.name.toLowerCase()
