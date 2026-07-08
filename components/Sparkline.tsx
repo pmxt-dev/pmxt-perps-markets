@@ -3,7 +3,24 @@
 import { useState } from 'react'
 import { fmtPrice, fmtPricePrecise } from '@/lib/format'
 
-// ponytail: ported from exchange-web Sparkline, normalized to arbitrary price ranges
+// Retro dithered price chart with an oracle overlay.
+//
+//   price  — the mark/last-price series, drawn as a Bayer-dithered filled area.
+//   oracle — the reference the book trades around, drawn as a continuous orange
+//            line. A null in the oracle series means the external feed is closed
+//            (e.g. a stock overnight), which breaks the line into a gap. A feed
+//            that holds a value between updates (DDR5 between prints, BTC ticking)
+//            just draws a line at that value — flat when held, moving when it moves.
+
+const COLS = 60
+const ROWS = 22
+const CELL = 6
+const GAP = 1.2
+const UP = '#00d68f'
+const DOWN = '#ff4d5e'
+const ORACLE = '#ff9f43'
+
+// 4x4 Bayer matrix — ordered dithering for the soft top edge of the fill
 const BAYER = [
   [0, 8, 2, 10],
   [12, 4, 14, 6],
@@ -12,114 +29,78 @@ const BAYER = [
 ]
 
 interface SparklineProps {
-  data: number[]
+  data: number[] // price series, oldest → newest
+  oracleSeries?: (number | null)[] // oracle aligned to `data`; null = feed closed
   isPositive?: boolean
-  // may contain nulls: a null is a gap (market closed, no live feed) and breaks
-  // the oracle line into separate segments
-  oracleSeries?: (number | null)[]
 }
 
-const COLS = 60
-const ROWS = 22
-const CELL = 6
-const GAP = 1.2
-
-function sampleTo(data: number[], cols: number): number[] {
-  const out: number[] = []
-  for (let c = 0; c < cols; c++) {
-    const pos = (c / (cols - 1)) * (data.length - 1)
-    const idx = Math.floor(pos)
-    const frac = pos - idx
-    const a = data[idx]
-    const b = data[Math.min(idx + 1, data.length - 1)]
-    out.push(a * (1 - frac) + b * frac)
-  }
-  return out
+// Resample any-length series to exactly `cols` points (linear interpolation).
+function resample(series: number[], cols: number): number[] {
+  return Array.from({ length: cols }, (_, c) => {
+    const pos = (c / (cols - 1)) * (series.length - 1)
+    const i = Math.floor(pos)
+    const f = pos - i
+    return series[i] * (1 - f) + series[Math.min(i + 1, series.length - 1)] * f
+  })
 }
 
-// null-aware resample: a column touching a null neighbour is itself null (a gap)
-function sampleToNullable(data: (number | null)[], cols: number): (number | null)[] {
-  const out: (number | null)[] = []
-  for (let c = 0; c < cols; c++) {
-    const pos = (c / (cols - 1)) * (data.length - 1)
-    const idx = Math.floor(pos)
-    const a = data[idx]
-    const b = data[Math.min(idx + 1, data.length - 1)]
-    if (a == null || b == null) { out.push(null); continue }
-    const frac = pos - idx
-    out.push(a * (1 - frac) + b * frac)
-  }
-  return out
+// Null-aware resample: a column drawing from a null neighbour is itself null.
+function resampleNullable(series: (number | null)[], cols: number): (number | null)[] {
+  return Array.from({ length: cols }, (_, c) => {
+    const pos = (c / (cols - 1)) * (series.length - 1)
+    const i = Math.floor(pos)
+    const a = series[i]
+    const b = series[Math.min(i + 1, series.length - 1)]
+    if (a == null || b == null) return null
+    const f = pos - i
+    return a * (1 - f) + b * f
+  })
 }
 
-export default function Sparkline({ data, isPositive, oracleSeries }: SparklineProps) {
+export default function Sparkline({ data, oracleSeries, isPositive }: SparklineProps) {
   const [hover, setHover] = useState<number | null>(null)
   if (!data || data.length < 2) return null
 
-  const oracleOk = !!oracleSeries && oracleSeries.some((v) => v != null)
-  const oracleVals = oracleOk ? oracleSeries!.filter((v): v is number => v != null) : []
-  const all = oracleVals.length ? [...data, ...oracleVals] : data
-  const rawMin = Math.min(...all)
-  const rawMax = Math.max(...all)
-  // pad the y-range: flat series render mid-height instead of collapsing to the
-  // bottom row, and tiny wiggles stop being amplified to full chart height
-  const rawRange = rawMax - rawMin
-  const pad = rawRange > 0 ? rawRange * 0.15 : Math.abs(rawMax) * 0.5 || 1
-  const min = rawMin - pad
-  const max = rawMax + pad
-  const range = max - min || 1
+  const price = resample(data, COLS)
+  const hasOracle = !!oracleSeries?.some((v) => v != null)
+  const oracle = hasOracle ? resampleNullable(oracleSeries!, COLS) : null
+
+  // y-scale spans price + oracle so both stay on-screen, with headroom padding
+  const values = [...price, ...(oracle?.filter((v): v is number => v != null) ?? [])]
+  const lo = Math.min(...values)
+  const hi = Math.max(...values)
+  const pad = hi - lo > 0 ? (hi - lo) * 0.15 : Math.abs(hi) * 0.5 || 1
+  const yMin = lo - pad
+  const yRange = hi + pad - yMin
 
   const w = COLS * CELL
   const h = ROWS * CELL
+  const xOf = (c: number) => c * CELL + CELL / 2
+  const yOf = (v: number) => h - (((v - yMin) / yRange) * (ROWS - 2) + 1) * CELL
 
-  const sampled = sampleTo(data, COLS)
-  // Collapse repeats of the same oracle value: a frozen oracle is recorded every
-  // tick but represents ONE print, so keep only the first occurrence + genuine
-  // value changes (the actual prints). A live feed whose value always changes is
-  // unaffected — its consecutive points stay and draw as a continuous line.
-  const sampledOracle = (() => {
-    if (!oracleOk) return null
-    const s = sampleToNullable(oracleSeries!, COLS)
-    let lastV: number | null = null
-    for (let i = 0; i < s.length; i++) {
-      const v = s[i]
-      if (v == null) continue
-      if (lastV != null && Math.abs(v - lastV) < 1e-9) { s[i] = null; continue }
-      lastV = v
-    }
-    return s
-  })()
+  const up = isPositive ?? price[price.length - 1] >= price[0]
+  const priceColor = up ? UP : DOWN
 
-  const trend = isPositive ?? data[data.length - 1] >= data[0]
-  const color = trend ? '#00d68f' : '#ff4d5e'
-
-  const dots = []
+  // price fill: one dithered column per sample
+  const cells: React.ReactNode[] = []
   for (let c = 0; c < COLS; c++) {
-    const norm = (sampled[c] - min) / range
-    const fillH = norm * (ROWS - 2) + 1
+    const fillH = ((price[c] - yMin) / yRange) * (ROWS - 2) + 1
     for (let r = 0; r < ROWS; r++) {
       const threshold = (BAYER[c % 4][r % 4] + 0.5) / 16
       let show = false
       let opacity = 0.9
-      if (r + 1 <= fillH) {
-        show = true
-      } else if (r < fillH) {
-        if (fillH - r > threshold) show = true
-      } else if (r < fillH + 1.5) {
-        if (threshold < 0.35 - (r - fillH) * 0.3) {
-          show = true
-          opacity = 0.55
-        }
-      }
+      if (r + 1 <= fillH) show = true
+      else if (r < fillH) show = fillH - r > threshold
+      else if (r < fillH + 1.5 && threshold < 0.35 - (r - fillH) * 0.3) { show = true; opacity = 0.55 }
       if (show) {
-        dots.push(
+        cells.push(
           <rect
-            key={`${c}-${r}`}
+            key={`p${c}-${r}`}
             x={c * CELL + GAP / 2}
             y={h - (r + 1) * CELL + GAP / 2}
             width={CELL - GAP}
             height={CELL - GAP}
-            fill={color}
+            fill={priceColor}
             opacity={opacity}
           />,
         )
@@ -127,23 +108,25 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
     }
   }
 
-  // break the oracle line at nulls (market-closed gaps) into separate segments
+  // oracle: continuous polyline, split into segments across null gaps
   const oracleSegments: string[][] = []
-  if (sampledOracle) {
+  if (oracle) {
     let seg: string[] = []
-    sampledOracle.forEach((v, c) => {
-      if (v == null) { if (seg.length) { oracleSegments.push(seg); seg = [] } return }
-      const y = h - (((v - min) / range) * (ROWS - 2) + 1) * CELL
-      seg.push(`${c * CELL + CELL / 2},${y}`)
+    oracle.forEach((v, c) => {
+      if (v == null) {
+        if (seg.length) oracleSegments.push(seg)
+        seg = []
+      } else {
+        seg.push(`${xOf(c)},${yOf(v)}`)
+      }
     })
     if (seg.length) oracleSegments.push(seg)
   }
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const col = Math.max(0, Math.min(COLS - 1, Math.round((x / rect.width) * (COLS - 1))))
-    setHover(col)
+    const col = Math.round(((e.clientX - rect.left) / rect.width) * (COLS - 1))
+    setHover(Math.max(0, Math.min(COLS - 1, col)))
   }
 
   return (
@@ -155,50 +138,24 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
       >
-        {dots}
-        {/* connect the oracle only where it's genuinely continuous (adjacent
-            samples); a discrete-print feed like DDR5 has isolated points and
-            renders as dots below, not a misleading "live" line */}
-        {oracleSegments.filter((s) => s.length >= 2).map((s, i) => (
-          <polyline
-            key={`o${i}`}
-            points={s.join(' ')}
-            fill="none"
-            stroke="#ff9f43"
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            opacity={0.95}
-          />
-        ))}
-        {/* isolated oracle points (a discrete print with no adjacent sample, e.g.
-            DDR5's 3/day) render as a dot — the moment the oracle was a real reading.
-            Continuous runs (BTC feed, TSLA during market hours) draw as the line
-            above; night/closed gaps (nulls) draw nothing. */}
-        {oracleSegments.filter((s) => s.length === 1).map((s, i) => {
-          const [x, y] = s[0].split(',').map(Number)
-          return (
-            <circle key={`od${i}`} cx={x} cy={y} r={Math.max(2.5, CELL * 0.6)} fill="#ff9f43" opacity={0.95} />
-          )
-        })}
+        {cells}
+        {oracleSegments.map((seg, i) =>
+          seg.length === 1 ? (
+            // a lone oracle point (feed briefly open) — a dot so it's still visible
+            <circle key={`o${i}`} cx={Number(seg[0].split(',')[0])} cy={Number(seg[0].split(',')[1])} r={2.5} fill={ORACLE} />
+          ) : (
+            <polyline key={`o${i}`} points={seg.join(' ')} fill="none" stroke={ORACLE} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          ),
+        )}
         {hover != null && (
-          <line
-            x1={hover * CELL + CELL / 2}
-            x2={hover * CELL + CELL / 2}
-            y1={0}
-            y2={h}
-            stroke="#e8e8ea"
-            strokeWidth={0.6}
-            strokeDasharray="2 3"
-            opacity={0.55}
-          />
+          <line x1={xOf(hover)} x2={xOf(hover)} y1={0} y2={h} stroke="#e8e8ea" strokeWidth={1} opacity={0.25} />
         )}
       </svg>
       {hover != null && (
         <div className="absolute top-1.5 right-1.5 font-mono text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
-          <span className={trend ? 'text-yes' : 'text-no'}>${fmtPrice(sampled[hover])}</span>
-          {sampledOracle && sampledOracle[hover] != null && (
-            <span className="text-[#ff9f43] ml-1.5">oracle ${fmtPricePrecise(sampledOracle[hover]!)}</span>
+          <span className={up ? 'text-yes' : 'text-no'}>${fmtPrice(price[hover])}</span>
+          {oracle?.[hover] != null && (
+            <span className="text-[#ff9f43] ml-1.5">oracle ${fmtPricePrecise(oracle[hover]!)}</span>
           )}
         </div>
       )}
