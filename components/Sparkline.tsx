@@ -73,19 +73,7 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
   const h = ROWS * CELL
 
   const sampled = sampleTo(data, COLS)
-  // The oracle is frozen between prints (a held value, not a gap), and the keeper
-  // only records it AT each print — so the series is sparse single points that the
-  // length>=2 segment filter drops, making the oracle vanish. Forward-fill (carry
-  // the last value) + back-fill leading nulls so it draws as a continuous line.
-  const sampledOracle = (() => {
-    if (!oracleOk) return null
-    const s = sampleToNullable(oracleSeries!, COLS)
-    let last: number | null = null
-    for (let i = 0; i < s.length; i++) { if (s[i] != null) last = s[i] as number; else if (last != null) s[i] = last }
-    let next: number | null = null
-    for (let i = s.length - 1; i >= 0; i--) { if (s[i] != null) next = s[i] as number; else if (next != null) s[i] = next }
-    return s
-  })()
+  const sampledOracle = oracleOk ? sampleToNullable(oracleSeries!, COLS) : null
 
   const trend = isPositive ?? data[data.length - 1] >= data[0]
   const color = trend ? '#00d68f' : '#ff4d5e'
@@ -153,6 +141,9 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
         onMouseLeave={() => setHover(null)}
       >
         {dots}
+        {/* connect the oracle only where it's genuinely continuous (adjacent
+            samples); a discrete-print feed like DDR5 has isolated points and
+            renders as dots below, not a misleading "live" line */}
         {oracleSegments.filter((s) => s.length >= 2).map((s, i) => (
           <polyline
             key={`o${i}`}
@@ -165,6 +156,20 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
             opacity={0.95}
           />
         ))}
+        {/* a dot at every actual oracle print — the moments the oracle is a real
+            reading (3×/day for DDR5). Always visible, even for isolated points. */}
+        {sampledOracle?.map((v, c) =>
+          v == null ? null : (
+            <circle
+              key={`od${c}`}
+              cx={c * CELL + CELL / 2}
+              cy={h - (((v - min) / range) * (ROWS - 2) + 1) * CELL}
+              r={Math.max(2.5, CELL * 0.6)}
+              fill="#ff9f43"
+              opacity={0.95}
+            />
+          ),
+        )}
         {hover != null && (
           <line
             x1={hover * CELL + CELL / 2}
