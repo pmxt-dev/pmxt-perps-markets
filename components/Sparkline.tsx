@@ -73,7 +73,22 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
   const h = ROWS * CELL
 
   const sampled = sampleTo(data, COLS)
-  const sampledOracle = oracleOk ? sampleToNullable(oracleSeries!, COLS) : null
+  // Collapse repeats of the same oracle value: a frozen oracle is recorded every
+  // tick but represents ONE print, so keep only the first occurrence + genuine
+  // value changes (the actual prints). A live feed whose value always changes is
+  // unaffected — its consecutive points stay and draw as a continuous line.
+  const sampledOracle = (() => {
+    if (!oracleOk) return null
+    const s = sampleToNullable(oracleSeries!, COLS)
+    let lastV: number | null = null
+    for (let i = 0; i < s.length; i++) {
+      const v = s[i]
+      if (v == null) continue
+      if (lastV != null && Math.abs(v - lastV) < 1e-9) { s[i] = null; continue }
+      lastV = v
+    }
+    return s
+  })()
 
   const trend = isPositive ?? data[data.length - 1] >= data[0]
   const color = trend ? '#00d68f' : '#ff4d5e'
