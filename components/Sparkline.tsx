@@ -73,7 +73,19 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
   const h = ROWS * CELL
 
   const sampled = sampleTo(data, COLS)
-  const sampledOracle = oracleOk ? sampleToNullable(oracleSeries!, COLS) : null
+  // The oracle is frozen between prints (a held value, not a gap), and the keeper
+  // only records it AT each print — so the series is sparse single points that the
+  // length>=2 segment filter drops, making the oracle vanish. Forward-fill (carry
+  // the last value) + back-fill leading nulls so it draws as a continuous line.
+  const sampledOracle = (() => {
+    if (!oracleOk) return null
+    const s = sampleToNullable(oracleSeries!, COLS)
+    let last: number | null = null
+    for (let i = 0; i < s.length; i++) { if (s[i] != null) last = s[i] as number; else if (last != null) s[i] = last }
+    let next: number | null = null
+    for (let i = s.length - 1; i >= 0; i--) { if (s[i] != null) next = s[i] as number; else if (next != null) s[i] = next }
+    return s
+  })()
 
   const trend = isPositive ?? data[data.length - 1] >= data[0]
   const color = trend ? '#00d68f' : '#ff4d5e'
