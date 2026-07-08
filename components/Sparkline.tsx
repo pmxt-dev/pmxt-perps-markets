@@ -156,20 +156,16 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
             opacity={0.95}
           />
         ))}
-        {/* a dot at every actual oracle print — the moments the oracle is a real
-            reading (3×/day for DDR5). Always visible, even for isolated points. */}
-        {sampledOracle?.map((v, c) =>
-          v == null ? null : (
-            <circle
-              key={`od${c}`}
-              cx={c * CELL + CELL / 2}
-              cy={h - (((v - min) / range) * (ROWS - 2) + 1) * CELL}
-              r={Math.max(2.5, CELL * 0.6)}
-              fill="#ff9f43"
-              opacity={0.95}
-            />
-          ),
-        )}
+        {/* isolated oracle points (a discrete print with no adjacent sample, e.g.
+            DDR5's 3/day) render as a dot — the moment the oracle was a real reading.
+            Continuous runs (BTC feed, TSLA during market hours) draw as the line
+            above; night/closed gaps (nulls) draw nothing. */}
+        {oracleSegments.filter((s) => s.length === 1).map((s, i) => {
+          const [x, y] = s[0].split(',').map(Number)
+          return (
+            <circle key={`od${i}`} cx={x} cy={y} r={Math.max(2.5, CELL * 0.6)} fill="#ff9f43" opacity={0.95} />
+          )
+        })}
         {hover != null && (
           <line
             x1={hover * CELL + CELL / 2}
