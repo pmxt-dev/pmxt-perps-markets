@@ -229,8 +229,8 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="text-right shrink-0 w-20 hidden sm:block">
-                    <div className="text-muted">{liquidity[market.id] !== undefined ? fmt(liquidity[market.id]) : '—'}</div>
-                    <div className="text-[10px] text-muted mt-0.5">liquidity</div>
+                    <div className="text-muted">{market.volume24h != null ? fmt(market.volume24h) : '—'}</div>
+                    <div className="text-[10px] text-muted mt-0.5">volume</div>
                   </div>
                   <span className="shrink-0 text-[10px] px-2 py-1 rounded-md border border-accent/40 text-accent">
                     trade
