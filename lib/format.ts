@@ -12,3 +12,12 @@ export function fmtPrice(p: number): string {
   }
   return p.toLocaleString('en-US', { minimumSignificantDigits: 3, maximumSignificantDigits: 4 })
 }
+
+// higher-precision variant for the oracle: traders need the exact reference
+// (47.067, not a rounded 47.07). Keeps 2 decimals for big-ticket assets so BTC
+// doesn't print noise digits.
+export function fmtPricePrecise(p: number): string {
+  if (Math.abs(p) >= 1000) return p.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  if (Math.abs(p) >= 1) return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+  return p.toLocaleString('en-US', { minimumSignificantDigits: 3, maximumSignificantDigits: 6 })
+}

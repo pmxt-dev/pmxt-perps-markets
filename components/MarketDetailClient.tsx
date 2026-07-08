@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { MARKETS } from '@/lib/data'
 import { Market } from '@/lib/types'
 import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
-import { fmtPrice } from '@/lib/format'
+import { fmtPrice, fmtPricePrecise } from '@/lib/format'
 import { useTradingWallet } from '@/lib/useTradingWallet'
 import Sparkline from '@/components/Sparkline'
 import BuySell from '@/components/BuySell'
@@ -320,7 +320,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
               {chartData && <Sparkline data={chartData} isPositive={up} oracleSeries={oracleSeries} />}
               {isYf ? (
                 <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-[#ff9f43]/40 rounded-md px-1.5 py-0.5 pointer-events-none">
-                  <span className="text-[#ff9f43]">— oracle ${fmtPrice(oraclePrice)}</span>
+                  <span className="text-[#ff9f43]">— oracle ${fmtPricePrecise(oraclePrice)}</span>
                   <span className="text-muted ml-1.5">yfinance · {market.sourceTicker}</span>
                 </div>
               ) : isChain && market.selfOracled ? (
@@ -337,7 +337,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
                     <span className="text-no">✗ chain feed: {chainError}</span>
                   ) : feedLive ? (
                     <>
-                      <span className="text-yes">— oracle ${fmtPrice(oraclePrice)}</span>
+                      <span className="text-yes">— oracle ${fmtPricePrecise(oraclePrice)}</span>
                       <span className="text-muted ml-1.5">pmxt chain · {market.chainSymbol}</span>
                     </>
                   ) : nextOracleAt ? (

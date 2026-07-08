@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { fmtPrice } from '@/lib/format'
+import { fmtPrice, fmtPricePrecise } from '@/lib/format'
 
 // ponytail: ported from exchange-web Sparkline, normalized to arbitrary price ranges
 const BAYER = [
@@ -198,7 +198,7 @@ export default function Sparkline({ data, isPositive, oracleSeries }: SparklineP
         <div className="absolute top-1.5 right-1.5 font-mono text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
           <span className={trend ? 'text-yes' : 'text-no'}>${fmtPrice(sampled[hover])}</span>
           {sampledOracle && sampledOracle[hover] != null && (
-            <span className="text-[#ff9f43] ml-1.5">oracle ${fmtPrice(sampledOracle[hover]!)}</span>
+            <span className="text-[#ff9f43] ml-1.5">oracle ${fmtPricePrecise(sampledOracle[hover]!)}</span>
           )}
         </div>
       )}
