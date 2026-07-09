@@ -183,6 +183,16 @@ export default function MarketDetailClient({ id }: { id: string }) {
     return () => { cancelled = true; clearInterval(iv) }
   }, [chainSymbol, refreshTick])
 
+  // live price in the browser tab, terminal-style — you can watch it from another
+  // tab. Must sit ABOVE the early return below so the hook runs every render.
+  useEffect(() => {
+    if (!market) return
+    const mark = market.sourceType === 'onchain'
+      ? (liveMark ?? liveOracle ?? market.price)
+      : (liveOracle ? liveOracle / 1.0018 : market.price)
+    document.title = `$${fmtPrice(mark)} ${market.symbol} · pmxt·perps`
+  }, [market, liveMark, liveOracle])
+
   if (!market) {
     return (
       <div className="font-mono text-sm">
@@ -207,11 +217,6 @@ export default function MarketDetailClient({ id }: { id: string }) {
   // oraclePrice is the raw stub oracle — only meaningful for oracle-fed markets.
   const oraclePrice = isChain ? (liveOracle ?? market.price) : (liveOracle ?? market.price * 1.0018)
   const markPrice = isChain ? (liveMark ?? liveOracle ?? market.price) : liveOracle ? liveOracle / 1.0018 : market.price
-
-  // live price in the browser tab, terminal-style — you can watch it from another tab
-  useEffect(() => {
-    document.title = `$${fmtPrice(markPrice)} ${market.symbol} · pmxt·perps`
-  }, [markPrice, market.symbol])
   // onchain markets: chart = recorded mark-price series (p), windowed by timeframe
   const chainCloses = (() => {
     if (!isChain || !chainPoints) return null
