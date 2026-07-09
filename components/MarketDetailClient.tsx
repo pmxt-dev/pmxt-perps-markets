@@ -22,10 +22,11 @@ const bytesToB64 = (bytes: Uint8Array) => {
 const TIMEFRAMES = ['1h', '7d', '30d', '1y', '5y', 'all'] as const
 type Timeframe = (typeof TIMEFRAMES)[number]
 
-// chain history buffer holds 24h of 15s samples — longer windows don't exist
-const CHAIN_TIMEFRAMES = ['5m', '1h', '6h', '24h', 'all'] as const
+// chain history buffer holds 24h of 15s samples — longer windows don't exist,
+// so there's no "all" option (it would just duplicate 24h). 24h is the default.
+const CHAIN_TIMEFRAMES = ['5m', '1h', '6h', '24h'] as const
 type ChainTimeframe = (typeof CHAIN_TIMEFRAMES)[number]
-const CHAIN_TF_MS: Record<Exclude<ChainTimeframe, 'all'>, number> = {
+const CHAIN_TF_MS: Record<ChainTimeframe, number> = {
   '5m': 5 * 60_000,
   '1h': 60 * 60_000,
   '6h': 6 * 60 * 60_000,
@@ -92,7 +93,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
     return () => clearInterval(iv)
   }, [])
   const [tf, setTf] = useState<Timeframe>('7d')
-  const [chainTf, setChainTf] = useState<ChainTimeframe>('all')
+  const [chainTf, setChainTf] = useState<ChainTimeframe>('24h')
   const [history, setHistory] = useState<number[] | null>(null)
   const [chainPoints, setChainPoints] = useState<ChainPoint[] | null>(null)
 
@@ -220,9 +221,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
   // onchain markets: chart = recorded mark-price series (p), windowed by timeframe
   const chainCloses = (() => {
     if (!isChain || !chainPoints) return null
-    const windowed = chainTf === 'all'
-      ? chainPoints
-      : chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
+    const windowed = chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
     const series = windowed.length >= 2 ? windowed : chainPoints
     return series.map(pt => pt.p)
   })()
@@ -231,9 +230,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
   // segments instead of drawing a fake continuous feed
   const chainOracleCloses = (() => {
     if (!isChain || market.selfOracled || !chainPoints) return null
-    const windowed = chainTf === 'all'
-      ? chainPoints
-      : chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
+    const windowed = chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
     const series = windowed.length >= 2 ? windowed : chainPoints
     const o = series.map(pt => (typeof pt.o === 'number' ? pt.o : null))
     return o.some(v => v !== null) ? o : null
