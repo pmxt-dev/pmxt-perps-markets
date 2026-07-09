@@ -21,7 +21,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
   }
 
-  const title = `${m.name} — pmxt·perps`
+  // the layout template appends " · pmxt·perps", so keep this bare to avoid the
+  // "DDR5 — pmxt·perps · pmxt·perps" double. The client sets a live-price title.
+  const title = m.name
   const description =
     m.meta?.description || `Trade ${m.name} perpetual futures on-chain, permissionless, USDC-settled.`
   const url = `/perps/${id}`
