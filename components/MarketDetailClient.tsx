@@ -338,7 +338,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
                   {chainError ? (
                     <span className="text-no">✗ chain feed: {chainError}</span>
                   ) : (
-                    <span className="text-muted" title="No external feed. Price = this market's own order book, time-averaged (EMA) so one trade can't move it.">self-priced — the order book is the feed (EMA) · pmxt chain</span>
+                    <span className="text-muted" title="No external feed. Price = this market's own order book, time-averaged (EMA) so one trade can't move it.">self-priced — the order book is the feed (EMA) · Solana</span>
                   )}
                 </div>
               ) : isChain ? (
@@ -348,7 +348,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
                   ) : feedLive ? (
                     <>
                       <span className="text-yes">— oracle ${fmtPricePrecise(oraclePrice)}</span>
-                      <span className="text-muted ml-1.5">pmxt chain · {market.chainSymbol}</span>
+                      <span className="text-muted ml-1.5">Solana · {market.chainSymbol}</span>
                     </>
                   ) : nextOracleAt ? (
                     // scheduled feed between prints: NOT closed. Book leads; oracle

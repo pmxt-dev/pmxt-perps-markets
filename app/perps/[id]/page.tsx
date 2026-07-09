@@ -65,7 +65,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
           '@context': 'https://schema.org',
           '@type': 'Product',
           name: m.name,
-          description: m.meta?.description || `${m.name} perpetual futures on the pmxt chain.`,
+          description: m.meta?.description || `${m.name} perpetual futures on Solana, permissionless, USDC-settled.`,
           category: m.meta?.category ?? undefined,
           image: m.meta?.thumbnail ?? undefined,
           url: `${SITE_URL}/perps/${id}`,

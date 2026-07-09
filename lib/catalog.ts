@@ -53,6 +53,6 @@ export function catalogToMarket(e: CatalogEntry): Market {
     selfOracled: e.selfOracled,
     sourceTicker: e.meta?.sourceTicker ?? undefined,
     thumbnail: e.meta?.thumbnail ?? undefined,
-    description: e.meta?.description ?? `${e.name} — deployed on the pmxt chain.`,
+    description: e.meta?.description ?? `${e.name} — deployed on Solana.`,
   }
 }
