@@ -38,6 +38,7 @@ interface ChainPoint {
   t: number
   p: number
   o?: number | null // null = market closed at this point → gap in the oracle line
+  v?: number // trade volume (USDC) in this candle bucket
 }
 
 // Format the next scheduled oracle print for the chart overlay: the viewer's
@@ -80,6 +81,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
   const [liveOracle, setLiveOracle] = useState<number | null>(null)
   const [liveMark, setLiveMark] = useState<number | null>(null)
   const [liveVol, setLiveVol] = useState<number | null>(null)
+  const [liveOI, setLiveOI] = useState<number | null>(null)
   // is a live external feed driving the oracle right now? (false off-hours) —
   // drives whether we draw the oracle line at all
   const [feedLive, setFeedLive] = useState<boolean>(false)
@@ -145,6 +147,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
           if (found && typeof found.oraclePrice === 'number') setLiveOracle(found.oraclePrice)
           if (found && typeof found.markPrice === 'number') setLiveMark(found.markPrice)
           if (found && typeof found.volume24hUsd === 'number') setLiveVol(found.volume24hUsd)
+          if (found && typeof found.openInterestUsd === 'number') setLiveOI(found.openInterestUsd)
           if (found && typeof found.oracleLive === 'boolean') setFeedLive(found.oracleLive)
           setNextOracleAt(found && typeof found.nextOracleAt === 'number' ? found.nextOracleAt : null)
         })
@@ -220,22 +223,24 @@ export default function MarketDetailClient({ id }: { id: string }) {
   const oraclePrice = isChain ? (liveOracle ?? market.price) : (liveOracle ?? market.price * 1.0018)
   const markPrice = isChain ? (liveMark ?? liveOracle ?? market.price) : liveOracle ? liveOracle / 1.0018 : market.price
   // onchain markets: chart = recorded mark-price series (p), windowed by timeframe
-  const chainCloses = (() => {
+  const windowedChainPoints = (() => {
     if (!isChain || !chainPoints) return null
     const windowed = chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
-    const series = windowed.length >= 2 ? windowed : chainPoints
-    return series.map(pt => pt.p)
+    return windowed.length >= 2 ? windowed : chainPoints
   })()
+  const chainCloses = windowedChainPoints?.map(pt => pt.p) ?? null
   // oracle overlay series for oracle-fed chain markets — traces the feed at its
   // true cadence: null buckets (feed closed) become gaps, so continuous feeds
   // draw a line, market-hours feeds draw segments, sparse prints draw dots
   const chainOracleCloses = (() => {
-    if (!isChain || market.selfOracled || !chainPoints) return null
-    const windowed = chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
-    const series = windowed.length >= 2 ? windowed : chainPoints
-    const o = series.map(pt => (typeof pt.o === 'number' ? pt.o : null))
+    if (!windowedChainPoints || market.selfOracled) return null
+    const o = windowedChainPoints.map(pt => (typeof pt.o === 'number' ? pt.o : null))
     return o.some(v => v !== null) ? o : null
   })()
+  // volume over the SAME window the chart shows (Σ per-candle USDC volume)
+  const windowVol = windowedChainPoints
+    ? windowedChainPoints.reduce((sum, pt) => sum + (pt.v ?? 0), 0)
+    : null
 
   // yfinance markets: chart = real history (mark = oracle / skew), oracle drawn as line series.
   // onchain markets: chart = the mark-price series; oracle-fed markets overlay the oracle line.
@@ -367,9 +372,14 @@ export default function MarketDetailClient({ id }: { id: string }) {
             </div>
 
             <div className="p-3 border-t border-border flex justify-between text-[10px] text-muted">
-              <span>vol {fmt(isChain ? (liveVol ?? 0) : market.volume24h)}</span>
+              {/* volume follows the chart window: viewing 24h shows 24h volume, all shows lifetime */}
+              <span>vol {isChain ? `${chainTf} ${fmt(windowVol ?? liveVol ?? 0)}` : fmt(market.volume24h)}</span>
               <span>resting liquidity {restingLiquidity !== null ? fmt(restingLiquidity) : '—'}</span>
-              <span>onchain · usdc</span>
+              {isChain ? (
+                <span>open interest {liveOI !== null ? fmt(liveOI) : '—'}</span>
+              ) : (
+                <span>onchain · usdc</span>
+              )}
             </div>
 
             <div className="px-4 py-3 border-t border-border">

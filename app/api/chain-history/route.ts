@@ -15,7 +15,7 @@ const CANDLE_QUERY: Record<string, string> = {
 }
 const DEFAULT_QUERY = 'interval=1m&limit=500' // 5m / 1h / 6h windows
 
-interface Candle { t: number; c: number; oc: number | null }
+interface Candle { t: number; c: number; oc: number | null; v?: number }
 
 export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get('symbol')?.trim()
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
         const message = typeof data?.error?.message === 'string' ? data.error.message : `chain feed returned ${res.status}`
         return { body: { error: message }, status: 502 }
       }
-      return { body: { symbol, points: (data as Candle[]).map((k) => ({ t: k.t, p: k.c, o: k.oc })) }, status: 200 }
+      return { body: { symbol, points: (data as Candle[]).map((k) => ({ t: k.t, p: k.c, o: k.oc, v: k.v ?? 0 })) }, status: 200 }
     } catch (e: unknown) {
       return { body: { error: e instanceof Error ? e.message : 'chain feed unreachable' }, status: 502 }
     }
