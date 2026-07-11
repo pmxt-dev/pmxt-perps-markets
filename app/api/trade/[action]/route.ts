@@ -44,6 +44,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ act
       res = await forward('/tx/setup', body)
     } else if (action === 'withdraw') {
       res = await forward('/tx/withdraw', body)
+    } else if (action === 'settle-pnl') {
+      // server-signed crank (permissionless on-chain) — no wallet signature needed
+      res = await forward('/settle-pnl', body)
     } else {
       return NextResponse.json({ error: 'unknown action' }, { status: 404 })
     }

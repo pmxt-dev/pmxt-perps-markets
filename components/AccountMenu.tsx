@@ -61,6 +61,21 @@ export function AccountMenu() {
   const walletUsdc = info?.walletUsdc ?? 0
   const tradingUsdc = info?.account?.usdcUi ?? 0
   const sol = info?.sol ?? 0
+  const unsettled = (info?.account?.positions ?? []).reduce((s, p) => s + p.unsettledPnlUi, 0)
+
+  const onSettle = async () => {
+    setError(null)
+    setBusy('settling PnL…')
+    try {
+      const r = await tradeApi('settle-pnl', { owner: addr })
+      if (!r.settled?.length && r.skipped?.length) setError(r.skipped[0].reason)
+      refresh()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'settle failed')
+    } finally {
+      setBusy(null)
+    }
+  }
   const amt = parseFloat(amount) || 0
   const max = Math.floor((tab === 'deposit' ? walletUsdc : tradingUsdc) * 100) / 100
 
@@ -138,6 +153,25 @@ export function AccountMenu() {
               <span className="text-muted">SOL (for fees)</span>
               <span className={sol < 0.03 ? 'text-no' : 'text-muted'}>{sol.toFixed(3)}</span>
             </div>
+            {Math.abs(unsettled) >= 0.01 && (
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-muted" title="trading PnL that hasn't been converted to USDC yet — settle to make it withdrawable">
+                  unsettled PnL
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className={unsettled >= 0 ? 'text-yes' : 'text-no'}>
+                    {unsettled >= 0 ? '+' : '−'}{usd(Math.abs(unsettled))}
+                  </span>
+                  <button
+                    onClick={onSettle}
+                    disabled={busy !== null}
+                    className="text-[10px] text-accent border border-accent/40 rounded px-2 py-0.5 hover:border-accent disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    settle
+                  </button>
+                </span>
+              </div>
+            )}
           </div>
 
           {/* deposit / withdraw tabs */}
