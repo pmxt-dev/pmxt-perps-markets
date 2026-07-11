@@ -25,6 +25,7 @@ interface LiveQuote {
   price: number
   change: number | null
   closes?: number[]
+  vol?: number // all-time USDC volume (Σ per-candle v over the full history)
 }
 
 export default function Home() {
@@ -90,9 +91,10 @@ export default function Home() {
                   .filter((p: unknown): p is number => typeof p === 'number')
                 if (closes.length < 2) return
                 const change = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100
+                const vol = h.points.reduce((s: number, pt: { v?: number }) => s + (pt.v ?? 0), 0)
                 setLive(prev => ({
                   ...prev,
-                  [m.id]: { price: closes[closes.length - 1], change, closes },
+                  [m.id]: { price: closes[closes.length - 1], change, closes, vol },
                 }))
               })
               .catch(() => {})
@@ -122,7 +124,8 @@ export default function Home() {
                   .filter((p: unknown): p is number => typeof p === 'number')
                 if (closes.length < 2) return
                 const change = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100
-                setLive(prev => ({ ...prev, [id]: { price: closes[closes.length - 1], change, closes } }))
+                const vol = h.points.reduce((s: number, pt: { v?: number }) => s + (pt.v ?? 0), 0)
+                setLive(prev => ({ ...prev, [id]: { price: closes[closes.length - 1], change, closes, vol } }))
               })
               .catch(() => {})
           }
@@ -216,7 +219,8 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="text-right shrink-0 w-20 hidden sm:block">
-                    <div className="text-muted">{market.volume24h != null ? fmt(market.volume24h) : '—'}</div>
+                    {/* chain markets: all-time volume (matches the all-time sparkline); yf keep 24h */}
+                    <div className="text-muted">{(quote?.vol ?? market.volume24h) != null ? fmt(quote?.vol ?? market.volume24h) : '—'}</div>
                     <div className="text-[10px] text-muted mt-0.5">volume</div>
                   </div>
                   <span className="shrink-0 text-[10px] px-2 py-1 rounded-md border border-accent/40 text-accent">
