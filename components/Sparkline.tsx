@@ -6,11 +6,11 @@ import { fmtPrice, fmtPricePrecise } from '@/lib/format'
 // Retro dithered price chart with an oracle overlay.
 //
 //   price  — the mark/last-price series, drawn as a Bayer-dithered filled area.
-//   oracle — the reference the book trades around, drawn as a continuous orange
-//            line. A null in the oracle series means the external feed is closed
-//            (e.g. a stock overnight), which breaks the line into a gap. A feed
-//            that holds a value between updates (DDR5 between prints, BTC ticking)
-//            just draws a line at that value — flat when held, moving when it moves.
+//   oracle — the reference the book trades around, drawn in orange at the feed's
+//            true cadence. A null means the external feed is closed at that point,
+//            so: continuous feeds (BTC ticking) → an unbroken line; market-hours
+//            feeds (stocks) → daytime segments with overnight gaps; sparse
+//            scheduled feeds (DDR5's 3 prints/day) → isolated dots per print.
 
 const COLS = 60
 const ROWS = 22
@@ -44,16 +44,25 @@ function resample(series: number[], cols: number): number[] {
   })
 }
 
-// Null-aware resample: a column drawing from a null neighbour is itself null.
+// Null-aware resample: interpolate where both neighbours exist; where they
+// don't, fall back to any value inside the column's slice of the source so an
+// isolated print (sparse scheduled feed) survives downsampling as a dot
+// instead of being dropped to null.
 function resampleNullable(series: (number | null)[], cols: number): (number | null)[] {
+  const toPos = (c: number) => (c / (cols - 1)) * (series.length - 1)
   return Array.from({ length: cols }, (_, c) => {
-    const pos = (c / (cols - 1)) * (series.length - 1)
+    const pos = toPos(c)
     const i = Math.floor(pos)
     const a = series[i]
     const b = series[Math.min(i + 1, series.length - 1)]
-    if (a == null || b == null) return null
-    const f = pos - i
-    return a * (1 - f) + b * f
+    if (a != null && b != null) {
+      const f = pos - i
+      return a * (1 - f) + b * f
+    }
+    const start = Math.ceil(toPos(Math.max(0, c - 0.5)))
+    const end = Math.floor(toPos(Math.min(cols - 1, c + 0.5)))
+    for (let j = start; j <= end; j++) if (series[j] != null) return series[j]
+    return null
   })
 }
 
