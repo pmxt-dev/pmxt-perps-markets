@@ -94,7 +94,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
     return () => clearInterval(iv)
   }, [])
   const [tf, setTf] = useState<Timeframe>('7d')
-  const [chainTf, setChainTf] = useState<ChainTimeframe>('24h')
+  const [chainTf, setChainTf] = useState<ChainTimeframe>('all')
   const [history, setHistory] = useState<number[] | null>(null)
   const [chainPoints, setChainPoints] = useState<ChainPoint[] | null>(null)
 
