@@ -77,10 +77,11 @@ export default function Home() {
             })
             return next
           })
-          // sparklines from the recorded mark-price series
+          // sparklines from the recorded mark-price series (all-time, like the
+          // detail page's default view)
           MARKETS.forEach(m => {
             if (m.sourceType !== 'onchain' || !m.chainSymbol) return
-            fetch(`/api/chain-history?symbol=${encodeURIComponent(m.chainSymbol)}`)
+            fetch(`/api/chain-history?symbol=${encodeURIComponent(m.chainSymbol)}&tf=all`)
               .then(async r => {
                 const h = await r.json()
                 if (cancelled || !r.ok || !Array.isArray(h.points)) return
@@ -112,7 +113,7 @@ export default function Home() {
           for (const m of entries) {
             const id = m.name.toLowerCase()
             if (MARKETS.some(sm => sm.id === id)) continue // static ones already handled
-            fetch(`/api/chain-history?symbol=${encodeURIComponent(m.name)}`)
+            fetch(`/api/chain-history?symbol=${encodeURIComponent(m.name)}&tf=all`)
               .then(async hr => {
                 const h = await hr.json()
                 if (cancelled || !hr.ok || !Array.isArray(h.points)) return

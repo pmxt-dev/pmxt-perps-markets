@@ -372,11 +372,11 @@ export default function MarketDetailClient({ id }: { id: string }) {
             </div>
 
             <div className="p-3 border-t border-border flex justify-between text-[10px] text-muted">
-              {/* volume follows the chart window: viewing 24h shows 24h volume, all shows lifetime */}
-              <span>vol {isChain ? `${chainTf} ${fmt(windowVol ?? liveVol ?? 0)}` : fmt(market.volume24h)}</span>
+              {/* volume follows the chart window (24h view = 24h volume, all = lifetime) */}
+              <span>vol {fmt(isChain ? (windowVol ?? liveVol ?? 0) : market.volume24h)}</span>
               <span>resting liquidity {restingLiquidity !== null ? fmt(restingLiquidity) : '—'}</span>
               {isChain ? (
-                <span>open interest {liveOI !== null ? fmt(liveOI) : '—'}</span>
+                <span>oi {liveOI !== null ? fmt(liveOI) : '—'}</span>
               ) : (
                 <span>onchain · usdc</span>
               )}
