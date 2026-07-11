@@ -226,9 +226,9 @@ export default function MarketDetailClient({ id }: { id: string }) {
     const series = windowed.length >= 2 ? windowed : chainPoints
     return series.map(pt => pt.p)
   })()
-  // oracle overlay series for oracle-fed chain markets — traces the feed, with
-  // nulls (gaps) where the market was closed so the line breaks into per-session
-  // segments instead of drawing a fake continuous feed
+  // oracle overlay series for oracle-fed chain markets — traces the on-chain
+  // oracle, which holds its last anchored print between sessions (the server
+  // carries oc forward); null only before the first-ever print → leading gap
   const chainOracleCloses = (() => {
     if (!isChain || market.selfOracled || !chainPoints) return null
     const windowed = chainPoints.filter(pt => pt.t >= Date.now() - CHAIN_TF_MS[chainTf])
