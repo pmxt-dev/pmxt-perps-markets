@@ -3,19 +3,30 @@ import { cached, cacheHeaders } from '@/lib/serverCache'
 
 // Price history from the standardized /v0 candles endpoint, flattened to the
 // {t, p} point series the charts expect (p = candle close). Cached ~10s per
-// symbol, shared across users.
+// symbol+window, shared across users.
 const CHAIN_MARKETS_API = process.env.CHAIN_MARKETS_API ?? 'http://65.109.107.152:8790'
+
+// candle interval/limit per chart window — the server retains 30 days of 15s
+// samples, so wider windows use coarser candles instead of getting truncated
+// at the last 500 minutes (which made 24h/all render identically).
+const CANDLE_QUERY: Record<string, string> = {
+  '24h': 'interval=5m&limit=288',
+  all: 'interval=1h&limit=720', // full 30-day retention
+}
+const DEFAULT_QUERY = 'interval=1m&limit=500' // 5m / 1h / 6h windows
 
 interface Candle { t: number; c: number; oc: number | null }
 
 export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get('symbol')?.trim()
   if (!symbol) return NextResponse.json({ error: 'symbol required' }, { status: 400 })
+  const tf = req.nextUrl.searchParams.get('tf')?.trim() ?? ''
+  const candleQuery = CANDLE_QUERY[tf] ?? DEFAULT_QUERY
 
-  const { body, status } = await cached(`chain-history:${symbol}`, 30_000, async () => {
+  const { body, status } = await cached(`chain-history:${symbol}:${candleQuery}`, 30_000, async () => {
     try {
       const res = await fetch(
-        `${CHAIN_MARKETS_API}/v0/markets/${encodeURIComponent(symbol)}/candles?interval=1m&limit=500`,
+        `${CHAIN_MARKETS_API}/v0/markets/${encodeURIComponent(symbol)}/candles?${candleQuery}`,
         { signal: AbortSignal.timeout(22_000) },
       )
       const data = await res.json()

@@ -22,15 +22,16 @@ const bytesToB64 = (bytes: Uint8Array) => {
 const TIMEFRAMES = ['1h', '7d', '30d', '1y', '5y', 'all'] as const
 type Timeframe = (typeof TIMEFRAMES)[number]
 
-// chain history buffer holds 24h of 15s samples — longer windows don't exist,
-// so there's no "all" option (it would just duplicate 24h). 24h is the default.
-const CHAIN_TIMEFRAMES = ['5m', '1h', '6h', '24h'] as const
+// chain history: the server retains 30 days of 15s samples; the proxy picks a
+// candle interval/limit per window, so 'all' = the full 30-day retention.
+const CHAIN_TIMEFRAMES = ['5m', '1h', '6h', '24h', 'all'] as const
 type ChainTimeframe = (typeof CHAIN_TIMEFRAMES)[number]
 const CHAIN_TF_MS: Record<ChainTimeframe, number> = {
   '5m': 5 * 60_000,
   '1h': 60 * 60_000,
   '6h': 6 * 60 * 60_000,
   '24h': 24 * 60 * 60_000,
+  all: Infinity,
 }
 
 interface ChainPoint {
@@ -151,7 +152,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
           if (!cancelled) setChainError(e instanceof Error ? e.message : 'chain feed unreachable')
         })
     const loadHistory = () =>
-      fetch(`/api/chain-history?symbol=${encodeURIComponent(chainSymbol)}`)
+      fetch(`/api/chain-history?symbol=${encodeURIComponent(chainSymbol)}&tf=${chainTf}`)
         .then(async r => {
           const d = await r.json()
           if (cancelled || !r.ok || !Array.isArray(d.points)) return
@@ -182,7 +183,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
     loadBook()
     const iv = setInterval(() => { load(); loadHistory(); loadBook() }, 6_000)
     return () => { cancelled = true; clearInterval(iv) }
-  }, [chainSymbol, refreshTick])
+  }, [chainSymbol, refreshTick, chainTf])
 
   // live price in the browser tab, terminal-style — you can watch it from another
   // tab. Must sit ABOVE the early return below so the hook runs every render.
