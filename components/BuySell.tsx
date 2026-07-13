@@ -176,9 +176,15 @@ export default function BuySell({ symbol, price, book, feeBps }: BuySellProps) {
   // positions consume equity while usdcUi stays untouched, so usdcUi over-quotes
   const marginBase = Math.max(0, info?.account?.equityUi ?? info?.account?.usdcUi ?? 0)
   const tradable = Math.floor((marginBase / ((1 + feeFrac) * (1 + fillBuffer))) * 100) / 100
-  const overMax = isBuy && tradable > 0 && amountNum > tradable
   const position = info?.account?.positions.find((p) => p.symbol === symbol)
   const positionSize = position ? Math.abs(position.baseUi) : 0
+  // margin applies to the exposure INCREASE only (mirrors the server pre-flight):
+  // reducing/closing an opposite position is always allowed, and both sides are
+  // gated — sells are share-denominated, so compare notional, not the raw input
+  const posBase = position?.baseUi ?? 0
+  const reducible = isBuy ? Math.max(0, -posBase) : Math.max(0, posBase)
+  const increaseNotional = Math.max(0, contracts - reducible) * effPrice
+  const overMax = increaseNotional > tradable + 1e-9
   const needsFunding = connected && (!info?.account || (tradable === 0 && !position))
   // default the deposit to the full wallet balance, floored to cents so it can
   // never round above the real balance (network fee is paid in SOL, not USDC)
@@ -232,7 +238,10 @@ export default function BuySell({ symbol, price, book, feeBps }: BuySellProps) {
       <div className="flex justify-between text-[11px] text-muted">
         <span>{orderType === 'market' ? 'est. entry' : 'mark'} <span className="text-text">${fmtPrice(price)}</span></span>
         {connected && (
-          <span title={`max buy after the ${(feeFrac * 100).toFixed(2)}% taker fee`}>tradable <span className="text-text">${tradable.toFixed(2)}</span></span>
+          <span title={`max new exposure after the ${(feeFrac * 100).toFixed(2)}% taker fee`}>
+            tradable <span className="text-text">${tradable.toFixed(2)}</span>
+            {!isBuy && effPrice > 0 && <span className="text-muted"> ≈ {(tradable / effPrice).toFixed(4)} sh</span>}
+          </span>
         )}
       </div>
 
@@ -344,6 +353,12 @@ export default function BuySell({ symbol, price, book, feeBps }: BuySellProps) {
       </div>
 
       {contracts > 0 && (
+        {overMax && (
+          <div className="text-[11px] text-no">
+            exceeds your margin — max new exposure ≈ ${tradable.toFixed(2)}
+            {!isBuy && effPrice > 0 ? ` (${(tradable / effPrice).toFixed(4)} sh${reducible > 0 ? ` + ${reducible.toFixed(4)} sh closing` : ''})` : ''}
+          </div>
+        )}
         <div className={`text-[11px] ${isBuy ? 'text-yes' : 'text-no'}`}>
           {orderType === 'market'
             ? `→ ${isBuy ? 'long' : 'short'} ${contracts.toFixed(2)} ${symbol}`
