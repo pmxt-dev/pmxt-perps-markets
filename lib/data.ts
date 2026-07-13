@@ -6,4 +6,4 @@ import { Market } from './types'
 // array stays empty so all markets load through the same path — no baked-in ones.
 export const MARKETS: Market[] = []
 
-export const CATEGORIES = ['All', 'Crypto', 'Pre-IPO', 'Indices', 'AI', 'Community'] as const
+export const CATEGORIES = ['All', 'Crypto', 'Pre-IPO', 'Indices', 'Commodities', 'AI', 'Community'] as const

@@ -8,6 +8,7 @@ import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
 import { fmtPrice, fmtPricePrecise } from '@/lib/format'
 import { useTradingWallet } from '@/lib/useTradingWallet'
 import Sparkline from '@/components/Sparkline'
+import ExpiryBadge, { isExpired } from '@/components/ExpiryBadge'
 import BuySell from '@/components/BuySell'
 import OrderBook, { BookData } from '@/components/OrderBook'
 import { Transaction } from '@solana/web3.js'
@@ -287,7 +288,10 @@ export default function MarketDetailClient({ id }: { id: string }) {
                   <img src={market.thumbnail} alt={market.symbol} className="w-8 h-8 rounded-md object-cover shrink-0" />
                 )}
                 <div className="min-w-0">
-                  <h1 className="text-sm font-medium leading-snug">&gt; {market.symbol}</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-sm font-medium leading-snug">&gt; {market.symbol}</h1>
+                    <ExpiryBadge expiresAt={market.expiresAt} />
+                  </div>
                   <div className="text-xs text-muted mt-1">{market.asset.toLowerCase()} · {market.category.toLowerCase()}</div>
                 </div>
               </div>
@@ -401,7 +405,14 @@ export default function MarketDetailClient({ id }: { id: string }) {
 
         <div className="md:col-span-1 flex flex-col gap-6">
           <div className="border border-border rounded-xl bg-panel p-4">
-            <BuySell symbol={market.symbol} price={markPrice} book={book} feeBps={liveFeeBps} />
+            {isExpired(market.expiresAt) ? (
+              <div className="border border-border rounded-lg p-4 text-xs text-muted leading-relaxed">
+                This market has expired. Positions were cash-settled at the final oracle price;
+                trading is closed.
+              </div>
+            ) : (
+              <BuySell symbol={market.symbol} price={markPrice} book={book} feeBps={liveFeeBps} />
+            )}
           </div>
           {chainSymbol && <MarketMeta chainSymbol={chainSymbol} />}
           {chainSymbol && <CreatorFees chainSymbol={chainSymbol} />}

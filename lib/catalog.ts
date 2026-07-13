@@ -16,6 +16,7 @@ export interface CatalogEntry {
     selfOracled: boolean
     sourceTicker: string | null
     thumbnail: string | null
+    expiresAt?: number | null
   } | null
 }
 
@@ -25,6 +26,8 @@ const CATEGORY_MAP: Record<string, Category> = {
   ai: 'AI',
   index: 'Indices',
   indices: 'Indices',
+  commodity: 'Commodities',
+  commodities: 'Commodities',
 }
 
 function toCategory(raw: string | undefined): Category {
@@ -53,6 +56,7 @@ export function catalogToMarket(e: CatalogEntry): Market {
     selfOracled: e.selfOracled,
     sourceTicker: e.meta?.sourceTicker ?? undefined,
     thumbnail: e.meta?.thumbnail ?? undefined,
+    expiresAt: e.meta?.expiresAt ?? null,
     description: e.meta?.description ?? `${e.name} — deployed on Solana.`,
   }
 }

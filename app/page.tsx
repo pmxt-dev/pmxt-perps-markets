@@ -8,6 +8,7 @@ import { Category, Market } from '@/lib/types'
 import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
 import { useTradingWallet } from '@/lib/useTradingWallet'
 import Sparkline from '@/components/Sparkline'
+import ExpiryBadge from '@/components/ExpiryBadge'
 import { Transaction } from '@solana/web3.js'
 
 const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), c => c.charCodeAt(0))
@@ -205,7 +206,10 @@ export default function Home() {
                       />
                     )}
                     <div className="min-w-0">
-                      <div className="text-text text-sm">{market.symbol}</div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="text-text text-sm">{market.symbol}</div>
+                        <ExpiryBadge expiresAt={market.expiresAt} />
+                      </div>
                       <div className="text-[10px] text-muted truncate mt-0.5">{market.asset.toLowerCase()}</div>
                     </div>
                   </div>

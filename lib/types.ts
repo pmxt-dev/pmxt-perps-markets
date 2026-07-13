@@ -20,6 +20,8 @@ export interface Market {
   description: string
   /** image url shown next to the market name; omitted → no image, no fallback */
   thumbnail?: string
+  /** dated market (future): epoch ms of expiry/settlement; absent/null = perpetual */
+  expiresAt?: number | null
 }
 
-export type Category = "All" | "Crypto" | "Pre-IPO" | "AI" | "Community" | "Indices"
+export type Category = "All" | "Crypto" | "Pre-IPO" | "AI" | "Community" | "Indices" | "Commodities"
