@@ -57,7 +57,8 @@ function OracleOverlay({ segments }: { segments: OracleSeg[] }) {
   const emphasis = ctx.selectedDataKey ?? ctx.focusDataKey
   const opacity = emphasis && emphasis !== 'oracle' ? 0.25 : 1
   return (
-    <g opacity={opacity}>
+    // fade in after the left-to-right reveal, like the lib's own <Dot>
+    <g style={{ opacity: ctx.entranceDone ? opacity : 0, transition: 'opacity 300ms ease' }}>
       {segments.map((seg, k) =>
         seg.length === 1 ? (
           <circle key={k} cx={ctx.xCenter(seg[0].i)} cy={ctx.y(seg[0].v)} r={2.5} fill={ORACLE} />
@@ -248,13 +249,12 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
     return (
       <div className="relative">
         {/* ponytail: stackType left at default — stacking would sum price+oracle.
-            animate off: the parent polls and rebuilds `data`, and dither-kit
-            replays its entrance on every data identity change. */}
+            entrance plays once per mount (patched chart-context ignores data
+            identity changes, so polling doesn't replay it) */}
         <AreaChart
           data={line.rows}
           config={line.config}
           bloom="aura"
-          animate={false}
           margins={{ top: 6, right: 8, bottom: 6, left: 44 }}
           className="w-full aspect-[30/11]"
         >

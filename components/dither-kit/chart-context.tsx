@@ -213,7 +213,9 @@ export function useChartController({
   // React Compiler memoizes every render-scope value below — no manual
   // useMemo/useCallback wrappers needed.
   const configKeys = Object.keys(config)
-  const revision = useRevision(data, replayToken)
+  // local change: entrance replays only on mount or via replayToken — NOT on
+  // data identity changes (polling callers rebuild `data` every few seconds)
+  const revision = useRevision(null, replayToken)
 
   const [selectedDataKey, setSelectedDataKey] = useState<string | null>(
     defaultSelectedDataKey
