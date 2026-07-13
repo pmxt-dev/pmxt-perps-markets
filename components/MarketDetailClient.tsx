@@ -7,7 +7,7 @@ import { Market } from '@/lib/types'
 import { catalogToMarket, CatalogEntry } from '@/lib/catalog'
 import { fmtPrice, fmtPricePrecise } from '@/lib/format'
 import { useTradingWallet } from '@/lib/useTradingWallet'
-import Sparkline from '@/components/Sparkline'
+import Sparkline, { CHART_MODES, type ChartMode } from '@/components/Sparkline'
 import ExpiryBadge, { isExpired } from '@/components/ExpiryBadge'
 import BuySell from '@/components/BuySell'
 import OrderBook, { BookData } from '@/components/OrderBook'
@@ -100,6 +100,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
   }, [])
   const [tf, setTf] = useState<Timeframe>('7d')
   const [chainTf, setChainTf] = useState<ChainTimeframe>('all')
+  const [chartMode, setChartMode] = useState<ChartMode>('line')
   const [history, setHistory] = useState<number[] | null>(null)
   const [chainPoints, setChainPoints] = useState<ChainPoint[] | null>(null)
 
@@ -265,6 +266,23 @@ export default function MarketDetailClient({ id }: { id: string }) {
   const up = changePct >= 0
   const changeLabel = isYf && history ? tf : chainCloses ? chainTf : '24h'
 
+  // chart view toggle — rendered inside the timeframe row, styled like its chips
+  const modeToggle = (
+    <div className="ml-auto flex gap-1.5">
+      {CHART_MODES.map((m) => (
+        <button
+          key={m}
+          onClick={() => setChartMode(m)}
+          className={`text-[10px] px-2 py-0.5 rounded-md border transition ${
+            chartMode === m ? 'border-accent text-accent bg-accent/10' : 'border-border text-muted hover:text-text'
+          }`}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <div className="flex flex-col gap-4">
       <Link href="/" className="font-mono text-xs text-muted hover:text-text transition">
@@ -318,6 +336,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
                     {t}
                   </button>
                 ))}
+                {modeToggle}
               </div>
             )}
             {isChain && (
@@ -333,11 +352,12 @@ export default function MarketDetailClient({ id }: { id: string }) {
                     {t}
                   </button>
                 ))}
+                {modeToggle}
               </div>
             )}
 
             <div className="relative">
-              {chartData && <Sparkline data={chartData} isPositive={up} oracleSeries={oracleSeries} showModes />}
+              {chartData && <Sparkline data={chartData} isPositive={up} oracleSeries={oracleSeries} mode={chartMode} />}
               {isYf ? (
                 <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-[#ff9f43]/40 rounded-md px-1.5 py-0.5 pointer-events-none">
                   <span className="text-[#ff9f43]">— oracle ${fmtPricePrecise(oraclePrice)}</span>

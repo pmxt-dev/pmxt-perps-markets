@@ -35,15 +35,16 @@ const BAYER = [
 ]
 
 // Two view modes: the original blocky mosaic, or a dither-kit style line
-// chart (crisp price line over the same dithered fill).
-const MODES = ['mosaic', 'line'] as const
-type ViewMode = (typeof MODES)[number]
+// chart. The parent owns the toggle (detail page renders it in the
+// timeframe-chip row); list cards just get the mosaic default.
+export const CHART_MODES = ['line', 'mosaic'] as const
+export type ChartMode = (typeof CHART_MODES)[number]
 
 interface SparklineProps {
   data: number[] // price series, oldest → newest
   oracleSeries?: (number | null)[] // oracle aligned to `data`; null = feed closed
   isPositive?: boolean
-  showModes?: boolean // render the view-mode switcher (detail page only)
+  mode?: ChartMode
 }
 
 type OracleSeg = { i: number; v: number }[]
@@ -110,11 +111,8 @@ function resampleNullable(series: (number | null)[], cols: number): (number | nu
   })
 }
 
-export default function Sparkline({ data, oracleSeries, isPositive, showModes }: SparklineProps) {
+export default function Sparkline({ data, oracleSeries, isPositive, mode = 'mosaic' }: SparklineProps) {
   const [hover, setHover] = useState<number | null>(null)
-  // detail page (showModes) defaults to the dither line chart; the small
-  // list-card sparklines keep the mosaic
-  const [mode, setMode] = useState<ViewMode>(showModes ? 'line' : 'mosaic')
 
   // dither-kit replays its entrance whenever `data` changes identity, so rows/
   // config must be referentially stable across renders — memoize off the props
@@ -231,20 +229,6 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
     setHover(Math.max(0, Math.min(COLS - 1, col)))
   }
 
-  const modeSwitcher = (
-    <div className="absolute bottom-1.5 left-1.5 flex gap-0.5 font-mono text-[9px] bg-bg/85 border border-border rounded-md px-1 py-0.5">
-      {MODES.map((m) => (
-        <button
-          key={m}
-          onClick={() => setMode(m)}
-          className={`px-1 rounded ${m === mode ? 'text-text bg-border/60' : 'text-muted hover:text-text'}`}
-        >
-          {m}
-        </button>
-      ))}
-    </div>
-  )
-
   if (mode === 'line' && line) {
     return (
       <div className="relative">
@@ -258,7 +242,9 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
           margins={{ top: 6, right: 8, bottom: 6, left: 44 }}
           className="w-full aspect-[30/11]"
         >
-          <YAxis tickFormatter={(v) => `$${fmtPrice(v + line.baseline)}`} />
+          {/* edgeInset keeps labels clear of the overlay pills; the bottom
+              tick is the padded baseline anyway (not a real price level) */}
+          <YAxis tickCount={5} edgeInset={26} tickFormatter={(v) => `$${fmtPrice(v + line.baseline)}`} />
           <Legend isClickable />
           <Tooltip valueFormatter={(v) => `$${fmtPricePrecise(v + line.baseline)}`} />
           <Area dataKey="price" variant="gradient" />
@@ -266,7 +252,6 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
           {line.hasOracle && <Area dataKey="oracle" variant="none" />}
           {line.hasOracle && <OracleOverlay segments={line.segments} />}
         </AreaChart>
-        {showModes && modeSwitcher}
       </div>
     )
   }
@@ -293,7 +278,6 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
           <line x1={xOf(hover)} x2={xOf(hover)} y1={0} y2={h} stroke="#e8e8ea" strokeWidth={1} opacity={0.25} />
         )}
       </svg>
-      {showModes && modeSwitcher}
       {hover != null && (
         <div className="absolute top-1.5 right-1.5 font-mono text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
           <span className={up ? 'text-yes' : 'text-no'}>${fmtPrice(price[hover])}</span>
