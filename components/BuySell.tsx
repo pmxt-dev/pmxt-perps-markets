@@ -165,10 +165,13 @@ export default function BuySell({ symbol, price, book, feeBps }: BuySellProps) {
     ? { bg: 'bg-yes', text: 'text-yes' }
     : { bg: 'bg-no', text: 'text-no' }
   // 1x venue: a buy locks full notional + the market's taker fee, so the real
-  // max spend is equity ÷ (1 + fee). Floored to cents so the display can never
-  // exceed what the chain will accept.
+  // max spend is equity ÷ (1 + fee). Market orders are additionally margined at
+  // the venue's 5% slippage cap (mirrors MARKET_ORDER_SLIPPAGE in exchange-core)
+  // because the fill can land above the mark — without this the shown max can
+  // pass the API pre-flight yet still bounce on-chain. Floored to cents.
   const feeFrac = (feeBps ?? 100) / 10_000
-  const tradable = Math.floor(((info?.account?.usdcUi ?? 0) / (1 + feeFrac)) * 100) / 100
+  const fillBuffer = orderType === 'market' ? 0.05 : 0
+  const tradable = Math.floor(((info?.account?.usdcUi ?? 0) / ((1 + feeFrac) * (1 + fillBuffer))) * 100) / 100
   const overMax = isBuy && tradable > 0 && amountNum > tradable
   const position = info?.account?.positions.find((p) => p.symbol === symbol)
   const positionSize = position ? Math.abs(position.baseUi) : 0
