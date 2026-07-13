@@ -270,6 +270,7 @@ function CreateMarket() {
   const [creatorFeeStr, setCreatorFeeStr] = useState('20')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<YfAsset[]>([])
+  const [coinbasePair, setCoinbasePair] = useState('')
   const [asset, setAsset] = useState<YfAsset | null>(null)
   const [searching, setSearching] = useState(false)
   const [seedStr, setSeedStr] = useState('')
@@ -289,6 +290,8 @@ function CreateMarket() {
   const seed = parseFloat(seedStr) || 0
   const seedTooLow = seedStr !== '' && seed < 100
   const isSelf = priceSource === 'orderbook'
+  const isCoinbase = priceSource === 'coinbase'
+  const coinbasePairOk = /^[A-Z0-9]{2,10}-[A-Z]{3,4}$/.test(coinbasePair.trim().toUpperCase())
   const listingPrice = parseFloat(listingPriceStr) || 0
 
   // free-form fee inputs: never rewrite what the user typed, just flag out-of-bounds
@@ -300,7 +303,7 @@ function CreateMarket() {
 
   const canDeploy =
     nameStr.trim() !== '' && !seedTooLow && seed >= 100 &&
-    (isSelf ? listingPrice > 0 : asset !== null) &&
+    (isSelf ? listingPrice > 0 : isCoinbase ? coinbasePairOk : asset !== null) &&
     !feeBpsError && !creatorFeeError && !feesIncomplete && deploying === null
 
   // client-signed create: prepare (server plumbing → unsigned tx) → the creator
@@ -319,7 +322,7 @@ function CreateMarket() {
           description: descStr,
           category: category === 'other' ? customCategory : category,
           priceSource,
-          sourceTicker: isSelf ? undefined : asset?.symbol,
+          sourceTicker: isSelf ? undefined : isCoinbase ? coinbasePair.trim().toUpperCase() : asset?.symbol,
           initialPrice: isSelf ? listingPrice : undefined,
           seedUsdc: seed,
           thumbnail: thumbnailUrl || undefined,
@@ -503,6 +506,7 @@ function CreateMarket() {
             className="w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-text outline-none focus:border-muted transition"
           >
             <option value="yfinance">yfinance</option>
+            <option value="coinbase">coinbase (crypto spot)</option>
             <option value="orderbook">orderbook (self-oracle)</option>
             <option value="custom-api" disabled>custom api — coming soon</option>
           </select>
@@ -554,6 +558,21 @@ function CreateMarket() {
                 )}
               </div>
             )}
+          </Field>
+        )}
+
+        {isCoinbase && (
+          <Field
+            label="asset"
+            hint="a coinbase spot pair — ETH-USD, SOL-USD, DOGE-USD… priced live 24/7 from coinbase's public spot api"
+          >
+            <input
+              type="text"
+              value={coinbasePair}
+              onChange={(e) => setCoinbasePair(e.target.value.toUpperCase())}
+              placeholder="ETH-USD"
+              className={`w-full bg-bg border rounded-md px-3 py-2 text-sm text-text placeholder-muted/50 outline-none transition ${coinbasePair && !coinbasePairOk ? 'border-no/60' : 'border-border focus:border-muted'}`}
+            />
           </Field>
         )}
 
