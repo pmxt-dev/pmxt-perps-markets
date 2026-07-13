@@ -20,11 +20,14 @@ export async function fetchCatalog(revalidateSeconds = 300): Promise<CatalogEntr
   }
 }
 
-// one market by route id (symbol, lowercased), or null if not found
+// one market by route id (symbol, lowercased), or null if not found. A miss on
+// the cached catalog retries uncached — a just-listed market must not 404 for
+// the length of the ISR window.
 export async function fetchMarketById(id: string, revalidateSeconds = 60): Promise<CatalogEntry | null> {
   const lc = id.toLowerCase()
-  const markets = await fetchCatalog(revalidateSeconds)
-  return markets.find((m) => m.name.toLowerCase() === lc) ?? null
+  const find = (ms: CatalogEntry[]) => ms.find((m) => m.name.toLowerCase() === lc) ?? null
+  const hit = find(await fetchCatalog(revalidateSeconds))
+  return hit ?? find(await fetchCatalog(0))
 }
 
 // recent mark-price series (candle closes) for a market — used to draw the

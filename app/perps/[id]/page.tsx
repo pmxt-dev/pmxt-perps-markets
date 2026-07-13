@@ -50,8 +50,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function MarketDetailPage({ params }: PageProps) {
   const { id: rawId } = await params
   const id = rawId.toLowerCase()
-  const catalog = await fetchCatalog()
-  const m = catalog.find(x => x.name.toLowerCase() === id)
+  let catalog = await fetchCatalog()
+  let m = catalog.find(x => x.name.toLowerCase() === id)
+  if (!m && catalog.length > 0) {
+    // cached catalog may predate a just-listed market — recheck uncached before 404ing
+    const fresh = await fetchCatalog(0)
+    if (fresh.length > 0) { catalog = fresh; m = fresh.find(x => x.name.toLowerCase() === id) }
+  }
 
   // only 404 when the catalog loaded successfully AND the market is genuinely
   // absent — an unreachable upstream or an empty catalog must never 404
