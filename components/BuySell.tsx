@@ -238,12 +238,18 @@ export default function BuySell({ symbol, price, book, feeBps }: BuySellProps) {
       <div className="flex justify-between text-[11px] text-muted">
         <span>{orderType === 'market' ? 'est. entry' : 'mark'} <span className="text-text">${fmtPrice(price)}</span></span>
         {connected && (
-          <span title={`max new exposure after the ${(feeFrac * 100).toFixed(2)}% taker fee`}>
+          <span title={`free margin after the ${(feeFrac * 100).toFixed(2)}% taker fee — cash $${(info?.account?.usdcUi ?? 0).toFixed(2)}, of which $${Math.max(0, (info?.account?.usdcUi ?? 0) - marginBase).toFixed(2)} is backing open positions`}>
             tradable <span className="text-text">${tradable.toFixed(2)}</span>
             {!isBuy && effPrice > 0 && <span className="text-muted"> ≈ {(tradable / effPrice).toFixed(4)} sh</span>}
           </span>
         )}
       </div>
+
+      {connected && info?.account && (info.account.usdcUi - marginBase) > 0.01 && (
+        <div className="text-[10px] text-muted -mt-1.5">
+          ${(info.account.usdcUi - marginBase).toFixed(2)} of your ${info.account.usdcUi.toFixed(2)} cash is margin for open positions — close them to free it
+        </div>
+      )}
 
       {position && Math.abs(position.baseUi) > 0 && (
         <div className="flex justify-between text-[11px] border border-border rounded-md px-2 py-1.5">

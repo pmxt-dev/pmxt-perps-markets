@@ -16,7 +16,7 @@ interface Position {
 interface AccountInfo {
   sol: number
   walletUsdc: number
-  account: { address: string; usdcUi: number; positions: Position[] } | null
+  account: { address: string; usdcUi: number; equityUi?: number; positions: Position[] } | null
 }
 
 interface OpenOrder {
@@ -166,8 +166,12 @@ export default function Portfolio() {
   }
 
   const positions = info?.account?.positions.filter(p => Math.abs(p.baseUi) > 0) ?? []
-  const tradable = info?.account?.usdcUi ?? 0
+  const cash = info?.account?.usdcUi ?? 0
   const totalPnl = positions.reduce((s, p) => s + p.unsettledPnlUi, 0)
+  // account value marks positions to market; free margin (init health) is what
+  // new exposure can be margined against — cash alone is neither of these
+  const accountValue = cash + totalPnl
+  const freeMargin = Math.max(0, info?.account?.equityUi ?? cash)
 
   const TABS: { key: Tab; label: string; count: number | null }[] = [
     { key: 'positions', label: 'positions', count: positions.length },
@@ -183,11 +187,16 @@ export default function Portfolio() {
         {error && <p className="text-xs text-no mt-1">✗ {error}</p>}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="border border-border rounded-xl bg-panel p-4">
+          <div className="text-[10px] text-muted uppercase tracking-widest">account value</div>
+          <div className="text-2xl font-semibold text-text mt-1.5">${accountValue.toFixed(2)}</div>
+          <div className="text-[10px] text-muted mt-1">${cash.toFixed(2)} cash {totalPnl >= 0 ? '+' : '−'} ${Math.abs(totalPnl).toFixed(2)} unsettled pnl</div>
+        </div>
         <div className="border border-border rounded-xl bg-panel p-4">
           <div className="text-[10px] text-muted uppercase tracking-widest">available to trade</div>
-          <div className="text-2xl font-semibold text-text mt-1.5">${tradable.toFixed(2)}</div>
-          <div className="text-[10px] text-muted mt-1">usdc in your trading account</div>
+          <div className="text-2xl font-semibold text-text mt-1.5">${freeMargin.toFixed(2)}</div>
+          <div className="text-[10px] text-muted mt-1">free margin — cash not backing open positions</div>
         </div>
         <div className="border border-border rounded-xl bg-panel p-4">
           <div className="text-[10px] text-muted uppercase tracking-widest">unsettled pnl</div>
