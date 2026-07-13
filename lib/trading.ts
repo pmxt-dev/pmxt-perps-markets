@@ -9,6 +9,7 @@ export interface AccountInfo {
   account: {
     address: string
     usdcUi: number
+    equityUi?: number
     positions: { symbol: string; baseUi: number; unsettledPnlUi: number }[]
   } | null
 }

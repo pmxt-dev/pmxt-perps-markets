@@ -25,6 +25,7 @@ interface AccountInfo {
   account: {
     address: string
     usdcUi: number
+    equityUi?: number
     positions: { symbol: string; baseUi: number; unsettledPnlUi: number }[]
   } | null
 }
@@ -171,7 +172,10 @@ export default function BuySell({ symbol, price, book, feeBps }: BuySellProps) {
   // pass the API pre-flight yet still bounce on-chain. Floored to cents.
   const feeFrac = (feeBps ?? 100) / 10_000
   const fillBuffer = orderType === 'market' ? 0.05 : 0
-  const tradable = Math.floor(((info?.account?.usdcUi ?? 0) / ((1 + feeFrac) * (1 + fillBuffer))) * 100) / 100
+  // margin against real equity (init health) when the API provides it — open
+  // positions consume equity while usdcUi stays untouched, so usdcUi over-quotes
+  const marginBase = Math.max(0, info?.account?.equityUi ?? info?.account?.usdcUi ?? 0)
+  const tradable = Math.floor((marginBase / ((1 + feeFrac) * (1 + fillBuffer))) * 100) / 100
   const overMax = isBuy && tradable > 0 && amountNum > tradable
   const position = info?.account?.positions.find((p) => p.symbol === symbol)
   const positionSize = position ? Math.abs(position.baseUi) : 0
