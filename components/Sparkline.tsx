@@ -28,12 +28,9 @@ const BAYER = [
   [15, 7, 13, 5],
 ]
 
-// View modes for the fill, à la tripwire.sh/dither-kit:
-//   solid    — every cell below the line (dithered top edge only)
-//   gradient — dither density fades toward the bottom
-//   dotted   — dot grid instead of squares
-//   hatched  — diagonal pixel stripes
-const MODES = ['solid', 'gradient', 'dotted', 'hatched'] as const
+// Two view modes: the original blocky mosaic, or a dither-kit style line
+// chart (crisp price line over the same dithered fill).
+const MODES = ['mosaic', 'line'] as const
 type ViewMode = (typeof MODES)[number]
 
 interface SparklineProps {
@@ -77,7 +74,7 @@ function resampleNullable(series: (number | null)[], cols: number): (number | nu
 
 export default function Sparkline({ data, oracleSeries, isPositive, showModes }: SparklineProps) {
   const [hover, setHover] = useState<number | null>(null)
-  const [mode, setMode] = useState<ViewMode>('solid')
+  const [mode, setMode] = useState<ViewMode>('mosaic')
   if (!data || data.length < 2) return null
 
   const price = resample(data, COLS)
@@ -108,40 +105,27 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
       const threshold = (BAYER[c % 4][r % 4] + 0.5) / 16
       let show = false
       let opacity = 0.9
-      if (r + 1 <= fillH) {
-        // interior cell — the view mode decides how it's drawn
-        if (mode === 'gradient') show = 0.15 + 0.85 * ((r + 0.5) / fillH) > threshold
-        else if (mode === 'hatched') show = (c + r) % 3 === 0
-        else show = true // solid + dotted fill every cell
-      }
+      if (r + 1 <= fillH) show = true
       else if (r < fillH) show = fillH - r > threshold
       else if (r < fillH + 1.5 && threshold < 0.35 - (r - fillH) * 0.3) { show = true; opacity = 0.55 }
       if (show) {
         cells.push(
-          mode === 'dotted' ? (
-            <circle
-              key={`p${c}-${r}`}
-              cx={c * CELL + CELL / 2}
-              cy={h - (r + 1) * CELL + CELL / 2}
-              r={(CELL - GAP) / 2.6}
-              fill={priceColor}
-              opacity={opacity}
-            />
-          ) : (
-            <rect
-              key={`p${c}-${r}`}
-              x={c * CELL + GAP / 2}
-              y={h - (r + 1) * CELL + GAP / 2}
-              width={CELL - GAP}
-              height={CELL - GAP}
-              fill={priceColor}
-              opacity={opacity}
-            />
-          ),
+          <rect
+            key={`p${c}-${r}`}
+            x={c * CELL + GAP / 2}
+            y={h - (r + 1) * CELL + GAP / 2}
+            width={CELL - GAP}
+            height={CELL - GAP}
+            fill={priceColor}
+            opacity={opacity}
+          />,
         )
       }
     }
   }
+
+  // line mode: a crisp line traces the price over the dithered fill
+  const priceLine = mode === 'line' ? price.map((v, c) => `${xOf(c)},${yOf(v)}`).join(' ') : null
 
   // oracle: continuous polyline, split into segments across null gaps
   const oracleSegments: string[][] = []
@@ -174,6 +158,9 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
         onMouseLeave={() => setHover(null)}
       >
         {cells}
+        {priceLine && (
+          <polyline points={priceLine} fill="none" stroke={priceColor} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        )}
         {oracleSegments.map((seg, i) =>
           seg.length === 1 ? (
             // a lone oracle point (feed briefly open) — a dot so it's still visible
