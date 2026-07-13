@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiError } from '@/lib/apiError'
 import Link from 'next/link'
 import { MARKETS, CATEGORIES } from '@/lib/data'
 import { fmtPrice } from '@/lib/format'
@@ -63,7 +64,7 @@ export default function Home() {
           const d = await r.json()
           if (cancelled) return
           if (!r.ok || !Array.isArray(d.markets)) {
-            setChainError(typeof d.error === 'string' ? d.error : 'chain feed unreachable')
+            setChainError(apiError(d, 'chain feed unreachable'))
             return
           }
           setChainError(null)
@@ -328,7 +329,7 @@ function CreateMarket() {
         }),
       })
       const pd = await prep.json()
-      if (!prep.ok) throw new Error(typeof pd.error === 'string' ? pd.error : 'deploy failed')
+      if (!prep.ok) throw new Error(apiError(pd, 'deploy failed'))
       const submit = async (txB64: string) => {
         const signed = await signTransaction(Transaction.from(b64ToBytes(txB64)))
         const sub = await fetch('/api/trade/submit', {
@@ -336,7 +337,7 @@ function CreateMarket() {
           body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
         })
         const sd = await sub.json()
-        if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+        if (!sub.ok) throw new Error(apiError(sd, 'submit failed'))
       }
       // 1/2 — fund the order book (you pay the ~2.5 SOL rent). /submit waits for
       // confirmation, so the accounts exist before the create tx initializes them.
@@ -351,7 +352,7 @@ function CreateMarket() {
         body: JSON.stringify(pd.pending),
       })
       const cd = await cr.json()
-      if (!cr.ok) throw new Error(typeof cd.error === 'string' ? cd.error : 'create failed')
+      if (!cr.ok) throw new Error(apiError(cd, 'create failed'))
       await submit(cd.tx)
       setDeploying('seeding the book…')
       const fin = await fetch('/api/deploy/finalize', {
@@ -359,7 +360,7 @@ function CreateMarket() {
         body: JSON.stringify({ ...pd.pending, oracle: cd.oracle }),
       })
       const fd = await fin.json()
-      if (!fin.ok) throw new Error(typeof fd.error === 'string' ? fd.error : 'finalize failed')
+      if (!fin.ok) throw new Error(apiError(fd, 'finalize failed'))
       setDeployed(fd.name)
       setNameStr(''); setDescStr(''); setSeedStr(''); setListingPriceStr(''); setAsset(null)
       window.dispatchEvent(new Event('pmxt:trade')) // triggers list refetch

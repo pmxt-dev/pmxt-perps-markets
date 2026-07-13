@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
+import { apiError } from '@/lib/apiError'
 import Link from 'next/link'
 import { MARKETS } from '@/lib/data'
 import { Market } from '@/lib/types'
@@ -143,7 +144,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
           const d = await r.json()
           if (cancelled) return
           if (!r.ok || !Array.isArray(d.markets)) {
-            setChainError(typeof d.error === 'string' ? d.error : 'chain feed unreachable')
+            setChainError(apiError(d, 'chain feed unreachable'))
             return
           }
           setChainError(null)
@@ -177,7 +178,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
           const d = await r.json()
           if (cancelled) return
           if (!r.ok || !Array.isArray(d.bids) || !Array.isArray(d.asks)) {
-            setBookError(typeof d.error === 'string' ? d.error : 'chain feed unreachable')
+            setBookError(apiError(d, 'chain feed unreachable'))
             return
           }
           setBookError(null)
@@ -594,14 +595,14 @@ function CreatorFees({ chainSymbol }: { chainSymbol: string }) {
         body: JSON.stringify({ owner: publicKey.toBase58(), symbol: chainSymbol }),
       })
       const d = await r.json()
-      if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'claim failed')
+      if (!r.ok) throw new Error(apiError(d, 'claim failed'))
       const signed = await signTransaction(Transaction.from(b64ToBytes(d.tx)))
       const sub = await fetch('/api/trade/submit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
       })
       const sd = await sub.json()
-      if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+      if (!sub.ok) throw new Error(apiError(sd, 'submit failed'))
       setMsg('✓ fees claimed to your wallet')
       load()
       window.dispatchEvent(new Event('pmxt:trade'))

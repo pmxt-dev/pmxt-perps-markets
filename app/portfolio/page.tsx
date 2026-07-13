@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { apiError } from '@/lib/apiError'
 import Link from 'next/link'
 import { Transaction } from '@solana/web3.js'
 import { useTradingWallet } from '@/lib/useTradingWallet'
@@ -69,7 +70,7 @@ export default function Portfolio() {
     if (!publicKey) { setInfo(null); setOrders(null); setFills(null); return }
     const owner = publicKey.toBase58()
     fetch(`/api/trade/account?owner=${encodeURIComponent(owner)}`)
-      .then(async r => { const d = await r.json(); if (r.ok) { setInfo(d); setError(null) } else setError(typeof d.error === 'string' ? d.error : 'account load failed') })
+      .then(async r => { const d = await r.json(); if (r.ok) { setInfo(d); setError(null) } else setError(apiError(d, 'account load failed')) })
       .catch(e => setError(e instanceof Error ? e.message : 'account load failed'))
     fetch(`/api/trade/orders?owner=${encodeURIComponent(owner)}`)
       .then(async r => { const d = await r.json(); if (r.ok && Array.isArray(d.orders)) setOrders(d.orders) })
@@ -103,14 +104,14 @@ export default function Portfolio() {
         body: JSON.stringify({ owner: publicKey.toBase58(), symbol: o.symbol, orderId: o.orderId }),
       })
       const d = await res.json()
-      if (!res.ok) throw new Error(typeof d.error === 'string' ? d.error : 'cancel failed')
+      if (!res.ok) throw new Error(apiError(d, 'cancel failed'))
       const signed = await signTransaction(Transaction.from(b64ToBytes(d.tx)))
       const sub = await fetch('/api/trade/submit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
       })
       const sd = await sub.json()
-      if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+      if (!sub.ok) throw new Error(apiError(sd, 'submit failed'))
       load()
       window.dispatchEvent(new Event('pmxt:trade'))
     } catch (e: unknown) {
@@ -133,14 +134,14 @@ export default function Portfolio() {
         body: JSON.stringify({ owner: publicKey.toBase58(), symbol }),
       })
       const d = await r.json()
-      if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'claim failed')
+      if (!r.ok) throw new Error(apiError(d, 'claim failed'))
       const signed = await signTransaction(Transaction.from(b64ToBytes(d.tx)))
       const sub = await fetch('/api/trade/submit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tx: bytesToB64(signed.serialize()) }),
       })
       const sd = await sub.json()
-      if (!sub.ok) throw new Error(typeof sd.error === 'string' ? sd.error : 'submit failed')
+      if (!sub.ok) throw new Error(apiError(sd, 'submit failed'))
       load()
       window.dispatchEvent(new Event('pmxt:trade'))
     } catch (e: unknown) {
