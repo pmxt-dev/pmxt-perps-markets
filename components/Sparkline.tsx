@@ -1,7 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { fmtPrice, fmtPricePrecise } from '@/lib/format'
+import { AreaChart } from '@/components/dither-kit/area-chart'
+import { Area } from '@/components/dither-kit/area'
+import { XAxis } from '@/components/dither-kit/x-axis'
+import { YAxis } from '@/components/dither-kit/y-axis'
+import { Legend } from '@/components/dither-kit/legend'
+import { Tooltip } from '@/components/dither-kit/tooltip'
 
 // Retro dithered price chart with an oracle overlay.
 //
@@ -75,6 +81,38 @@ function resampleNullable(series: (number | null)[], cols: number): (number | nu
 export default function Sparkline({ data, oracleSeries, isPositive, showModes }: SparklineProps) {
   const [hover, setHover] = useState<number | null>(null)
   const [mode, setMode] = useState<ViewMode>('mosaic')
+
+  // dither-kit replays its entrance whenever `data` changes identity, so rows/
+  // config must be referentially stable across renders — memoize off the props
+  const line = useMemo(() => {
+    if (!data || data.length < 2) return null
+    const price = resample(data, COLS)
+    const hasOracle = !!oracleSeries?.some((v) => v != null)
+    const oracle = hasOracle ? resampleNullable(oracleSeries!, COLS) : null
+    const up = isPositive ?? price[price.length - 1] >= price[0]
+    // dither-kit coerces null → 0, which would slam a sparse oracle (DDR5's 3
+    // prints/day) to the floor — forward-fill so gaps hold the last print
+    let lastPrint: number | null = null
+    const filled = oracle?.map((v) => (v != null ? (lastPrint = v) : lastPrint))
+    // dither-kit's y-domain is hard [0, max] — a $48 price plotted from $0 is a
+    // featureless slab, so plot deltas above a padded floor and add the
+    // baseline back in the axis/tooltip formatters
+    const values = [...price, ...(filled?.filter((v): v is number => v != null) ?? [])]
+    const vLo = Math.min(...values)
+    const vHi = Math.max(...values)
+    const baseline = vLo - (vHi - vLo > 0 ? (vHi - vLo) * 0.25 : Math.abs(vHi) * 0.5 || 1)
+    const rows = price.map((v, c) => ({
+      t: c,
+      price: v - baseline,
+      ...(filled?.[c] != null ? { oracle: filled[c]! - baseline } : {}),
+    }))
+    const config = {
+      price: { label: 'price', color: up ? ('green' as const) : ('red' as const) },
+      ...(oracle ? { oracle: { label: 'oracle', color: 'orange' as const } } : {}),
+    }
+    return { rows, config, hasOracle, baseline }
+  }, [data, oracleSeries, isPositive])
+
   if (!data || data.length < 2) return null
 
   const price = resample(data, COLS)
@@ -124,9 +162,6 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
     }
   }
 
-  // line mode: a crisp line traces the price over the dithered fill
-  const priceLine = mode === 'line' ? price.map((v, c) => `${xOf(c)},${yOf(v)}`).join(' ') : null
-
   // oracle: continuous polyline, split into segments across null gaps
   const oracleSegments: string[][] = []
   if (oracle) {
@@ -148,6 +183,37 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
     setHover(Math.max(0, Math.min(COLS - 1, col)))
   }
 
+  const modeSwitcher = (
+    <div className="absolute bottom-1.5 left-1.5 flex gap-0.5 font-mono text-[9px] bg-bg/85 border border-border rounded-md px-1 py-0.5">
+      {MODES.map((m) => (
+        <button
+          key={m}
+          onClick={() => setMode(m)}
+          className={`px-1 rounded ${m === mode ? 'text-text bg-border/60' : 'text-muted hover:text-text'}`}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (mode === 'line' && line) {
+    return (
+      <div className="relative">
+        {/* ponytail: stackType left at default — stacking would sum price+oracle */}
+        <AreaChart data={line.rows} config={line.config} bloom="aura" className="h-44 w-full">
+          <XAxis dataKey="t" tickFormatter={() => ''} />
+          <YAxis tickFormatter={(v) => `$${fmtPrice(v + line.baseline)}`} />
+          <Legend isClickable />
+          <Tooltip valueFormatter={(v) => `$${fmtPricePrecise(v + line.baseline)}`} />
+          <Area dataKey="price" variant="gradient" />
+          {line.hasOracle && <Area dataKey="oracle" variant="hatched" />}
+        </AreaChart>
+        {showModes && modeSwitcher}
+      </div>
+    )
+  }
+
   return (
     <div className="relative">
       <svg
@@ -158,9 +224,6 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
         onMouseLeave={() => setHover(null)}
       >
         {cells}
-        {priceLine && (
-          <polyline points={priceLine} fill="none" stroke={priceColor} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-        )}
         {oracleSegments.map((seg, i) =>
           seg.length === 1 ? (
             // a lone oracle point (feed briefly open) — a dot so it's still visible
@@ -173,19 +236,7 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
           <line x1={xOf(hover)} x2={xOf(hover)} y1={0} y2={h} stroke="#e8e8ea" strokeWidth={1} opacity={0.25} />
         )}
       </svg>
-      {showModes && (
-        <div className="absolute bottom-1.5 left-1.5 flex gap-0.5 font-mono text-[9px] bg-bg/85 border border-border rounded-md px-1 py-0.5">
-          {MODES.map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`px-1 rounded ${m === mode ? 'text-text bg-border/60' : 'text-muted hover:text-text'}`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      )}
+      {showModes && modeSwitcher}
       {hover != null && (
         <div className="absolute top-1.5 right-1.5 font-mono text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
           <span className={up ? 'text-yes' : 'text-no'}>${fmtPrice(price[hover])}</span>
