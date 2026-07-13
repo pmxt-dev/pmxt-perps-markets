@@ -25,16 +25,23 @@ export async function GET(req: NextRequest) {
 
   const { body, status } = await cached(`chain-history:${symbol}:${candleQuery}`, 30_000, async () => {
     try {
-      const res = await fetch(
-        `${CHAIN_MARKETS_API}/v0/markets/${encodeURIComponent(symbol)}/candles?${candleQuery}`,
-        { signal: AbortSignal.timeout(22_000) },
-      )
-      const data = await res.json()
-      if (!res.ok || !Array.isArray(data)) {
-        const message = typeof data?.error?.message === 'string' ? data.error.message : `chain feed returned ${res.status}`
-        return { body: { error: message }, status: 502 }
+      const load = async (query: string) => {
+        const res = await fetch(
+          `${CHAIN_MARKETS_API}/v0/markets/${encodeURIComponent(symbol)}/candles?${query}`,
+          { signal: AbortSignal.timeout(22_000) },
+        )
+        const data = await res.json()
+        if (!res.ok || !Array.isArray(data)) {
+          const message = typeof data?.error?.message === 'string' ? data.error.message : `chain feed returned ${res.status}`
+          throw new Error(message)
+        }
+        return (data as Candle[]).map((k) => ({ t: k.t, p: k.c, o: k.oc, v: k.v ?? 0 }))
       }
-      return { body: { symbol, points: (data as Candle[]).map((k) => ({ t: k.t, p: k.c, o: k.oc, v: k.v ?? 0 })) }, status: 200 }
+      let points = await load(candleQuery)
+      // a young market may not span 2 coarse buckets yet (charts need ≥2 points
+      // to draw) — fall back to fine candles rather than rendering nothing
+      if (points.length < 2 && candleQuery !== DEFAULT_QUERY) points = await load(DEFAULT_QUERY)
+      return { body: { symbol, points }, status: 200 }
     } catch (e: unknown) {
       return { body: { error: e instanceof Error ? e.message : 'chain feed unreachable' }, status: 502 }
     }
