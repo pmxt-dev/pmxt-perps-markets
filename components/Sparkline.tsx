@@ -111,7 +111,9 @@ function resampleNullable(series: (number | null)[], cols: number): (number | nu
 
 export default function Sparkline({ data, oracleSeries, isPositive, showModes }: SparklineProps) {
   const [hover, setHover] = useState<number | null>(null)
-  const [mode, setMode] = useState<ViewMode>('mosaic')
+  // detail page (showModes) defaults to the dither line chart; the small
+  // list-card sparklines keep the mosaic
+  const [mode, setMode] = useState<ViewMode>(showModes ? 'line' : 'mosaic')
 
   // dither-kit replays its entrance whenever `data` changes identity, so rows/
   // config must be referentially stable across renders — memoize off the props
