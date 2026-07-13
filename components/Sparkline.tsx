@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { fmtPrice, fmtPricePrecise } from '@/lib/format'
 import { AreaChart } from '@/components/dither-kit/area-chart'
 import { Area } from '@/components/dither-kit/area'
-import { XAxis } from '@/components/dither-kit/x-axis'
+import { useChart } from '@/components/dither-kit/chart-context'
 import { YAxis } from '@/components/dither-kit/y-axis'
 import { Legend } from '@/components/dither-kit/legend'
 import { Tooltip } from '@/components/dither-kit/tooltip'
@@ -44,6 +44,37 @@ interface SparklineProps {
   oracleSeries?: (number | null)[] // oracle aligned to `data`; null = feed closed
   isPositive?: boolean
   showModes?: boolean // render the view-mode switcher (detail page only)
+}
+
+type OracleSeg = { i: number; v: number }[]
+
+// Oracle drawn exactly like mosaic mode — polyline segments across gaps,
+// lone prints as dots — as a composed chart part so it shares the dither
+// chart's scales. Values arrive already baseline-shifted.
+function OracleOverlay({ segments }: { segments: OracleSeg[] }) {
+  const ctx = useChart()
+  if (!ctx.ready) return null
+  const emphasis = ctx.selectedDataKey ?? ctx.focusDataKey
+  const opacity = emphasis && emphasis !== 'oracle' ? 0.25 : 1
+  return (
+    <g opacity={opacity}>
+      {segments.map((seg, k) =>
+        seg.length === 1 ? (
+          <circle key={k} cx={ctx.xCenter(seg[0].i)} cy={ctx.y(seg[0].v)} r={2.5} fill={ORACLE} />
+        ) : (
+          <polyline
+            key={k}
+            points={seg.map((p) => `${ctx.xCenter(p.i)},${ctx.y(p.v)}`).join(' ')}
+            fill="none"
+            stroke={ORACLE}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ),
+      )}
+    </g>
+  )
 }
 
 // Resample any-length series to exactly `cols` points (linear interpolation).
@@ -110,7 +141,21 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
       price: { label: 'price', color: up ? ('green' as const) : ('red' as const) },
       ...(oracle ? { oracle: { label: 'oracle', color: 'orange' as const } } : {}),
     }
-    return { rows, config, hasOracle, baseline }
+    // segments of the REAL (un-filled) oracle for the overlay, baseline-shifted
+    const segments: OracleSeg[] = []
+    if (oracle) {
+      let seg: OracleSeg = []
+      oracle.forEach((v, i) => {
+        if (v == null) {
+          if (seg.length) segments.push(seg)
+          seg = []
+        } else {
+          seg.push({ i, v: v - baseline })
+        }
+      })
+      if (seg.length) segments.push(seg)
+    }
+    return { rows, config, hasOracle, baseline, segments }
   }, [data, oracleSeries, isPositive])
 
   if (!data || data.length < 2) return null
@@ -200,14 +245,24 @@ export default function Sparkline({ data, oracleSeries, isPositive, showModes }:
   if (mode === 'line' && line) {
     return (
       <div className="relative">
-        {/* ponytail: stackType left at default — stacking would sum price+oracle */}
-        <AreaChart data={line.rows} config={line.config} bloom="aura" className="h-44 w-full">
-          <XAxis dataKey="t" tickFormatter={() => ''} />
+        {/* ponytail: stackType left at default — stacking would sum price+oracle.
+            animate off: the parent polls and rebuilds `data`, and dither-kit
+            replays its entrance on every data identity change. */}
+        <AreaChart
+          data={line.rows}
+          config={line.config}
+          bloom="aura"
+          animate={false}
+          margins={{ top: 6, right: 8, bottom: 6, left: 44 }}
+          className="w-full aspect-[30/11]"
+        >
           <YAxis tickFormatter={(v) => `$${fmtPrice(v + line.baseline)}`} />
           <Legend isClickable />
           <Tooltip valueFormatter={(v) => `$${fmtPricePrecise(v + line.baseline)}`} />
           <Area dataKey="price" variant="gradient" />
-          {line.hasOracle && <Area dataKey="oracle" variant="hatched" />}
+          {/* oracle: in config for scale/legend/tooltip, painted only by the overlay */}
+          {line.hasOracle && <Area dataKey="oracle" variant="none" />}
+          {line.hasOracle && <OracleOverlay segments={line.segments} />}
         </AreaChart>
         {showModes && modeSwitcher}
       </div>

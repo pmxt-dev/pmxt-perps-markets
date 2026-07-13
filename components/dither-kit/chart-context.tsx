@@ -31,7 +31,9 @@ export type Margins = {
 
 type Row = Record<string, unknown>
 
-export type AreaVariant = "gradient" | "dotted" | "hatched" | "solid"
+// "none": series participates in scale/legend/tooltip but the canvas skips it
+// (local addition — lets a custom SVG part own the series' visual)
+export type AreaVariant = "gradient" | "dotted" | "hatched" | "solid" | "none"
 export type StrokeVariant = "solid" | "dashed"
 export type SeriesKind = "area" | "line" | "bar"
 

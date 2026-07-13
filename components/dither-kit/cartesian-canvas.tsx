@@ -308,6 +308,7 @@ export function CartesianCanvas() {
     for (const key of ctx.configKeys) {
       const band = ctx.bands[key]
       if (!band) continue
+      if (ctx.seriesSpecs[key]?.variant === "none") continue
       const line = (ctx.seriesSpecs[key]?.kind ?? defaultKind) === "line"
       const top = band.map((b) => (ctx.y(b[1]) / h) * (rows - 1))
       const floor = band.map((b, i) =>
