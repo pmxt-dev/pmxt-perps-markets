@@ -28,10 +28,19 @@ const BAYER = [
   [15, 7, 13, 5],
 ]
 
+// View modes for the fill, à la tripwire.sh/dither-kit:
+//   solid    — every cell below the line (dithered top edge only)
+//   gradient — dither density fades toward the bottom
+//   dotted   — dot grid instead of squares
+//   hatched  — diagonal pixel stripes
+const MODES = ['solid', 'gradient', 'dotted', 'hatched'] as const
+type ViewMode = (typeof MODES)[number]
+
 interface SparklineProps {
   data: number[] // price series, oldest → newest
   oracleSeries?: (number | null)[] // oracle aligned to `data`; null = feed closed
   isPositive?: boolean
+  showModes?: boolean // render the view-mode switcher (detail page only)
 }
 
 // Resample any-length series to exactly `cols` points (linear interpolation).
@@ -66,8 +75,9 @@ function resampleNullable(series: (number | null)[], cols: number): (number | nu
   })
 }
 
-export default function Sparkline({ data, oracleSeries, isPositive }: SparklineProps) {
+export default function Sparkline({ data, oracleSeries, isPositive, showModes }: SparklineProps) {
   const [hover, setHover] = useState<number | null>(null)
+  const [mode, setMode] = useState<ViewMode>('solid')
   if (!data || data.length < 2) return null
 
   const price = resample(data, COLS)
@@ -98,20 +108,36 @@ export default function Sparkline({ data, oracleSeries, isPositive }: SparklineP
       const threshold = (BAYER[c % 4][r % 4] + 0.5) / 16
       let show = false
       let opacity = 0.9
-      if (r + 1 <= fillH) show = true
+      if (r + 1 <= fillH) {
+        // interior cell — the view mode decides how it's drawn
+        if (mode === 'gradient') show = 0.15 + 0.85 * ((r + 0.5) / fillH) > threshold
+        else if (mode === 'hatched') show = (c + r) % 3 === 0
+        else show = true // solid + dotted fill every cell
+      }
       else if (r < fillH) show = fillH - r > threshold
       else if (r < fillH + 1.5 && threshold < 0.35 - (r - fillH) * 0.3) { show = true; opacity = 0.55 }
       if (show) {
         cells.push(
-          <rect
-            key={`p${c}-${r}`}
-            x={c * CELL + GAP / 2}
-            y={h - (r + 1) * CELL + GAP / 2}
-            width={CELL - GAP}
-            height={CELL - GAP}
-            fill={priceColor}
-            opacity={opacity}
-          />,
+          mode === 'dotted' ? (
+            <circle
+              key={`p${c}-${r}`}
+              cx={c * CELL + CELL / 2}
+              cy={h - (r + 1) * CELL + CELL / 2}
+              r={(CELL - GAP) / 2.6}
+              fill={priceColor}
+              opacity={opacity}
+            />
+          ) : (
+            <rect
+              key={`p${c}-${r}`}
+              x={c * CELL + GAP / 2}
+              y={h - (r + 1) * CELL + GAP / 2}
+              width={CELL - GAP}
+              height={CELL - GAP}
+              fill={priceColor}
+              opacity={opacity}
+            />
+          ),
         )
       }
     }
@@ -160,6 +186,19 @@ export default function Sparkline({ data, oracleSeries, isPositive }: SparklineP
           <line x1={xOf(hover)} x2={xOf(hover)} y1={0} y2={h} stroke="#e8e8ea" strokeWidth={1} opacity={0.25} />
         )}
       </svg>
+      {showModes && (
+        <div className="absolute bottom-1.5 left-1.5 flex gap-0.5 font-mono text-[9px] bg-bg/85 border border-border rounded-md px-1 py-0.5">
+          {MODES.map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`px-1 rounded ${m === mode ? 'text-text bg-border/60' : 'text-muted hover:text-text'}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
       {hover != null && (
         <div className="absolute top-1.5 right-1.5 font-mono text-[10px] bg-bg/85 border border-border rounded-md px-1.5 py-0.5 pointer-events-none">
           <span className={up ? 'text-yes' : 'text-no'}>${fmtPrice(price[hover])}</span>

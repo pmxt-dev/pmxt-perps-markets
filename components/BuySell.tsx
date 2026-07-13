@@ -14,6 +14,9 @@ interface BuySellProps {
   symbol: string
   price: number
   book?: BookData | null
+  // the market's taker fee (per-market, set at listing); tradable is quoted
+  // net of it so the shown max always survives the on-chain health check
+  feeBps?: number | null
 }
 
 interface AccountInfo {
@@ -54,7 +57,7 @@ async function tradeApi(action: string, body: unknown): Promise<any> {
   return data
 }
 
-export default function BuySell({ symbol, price, book }: BuySellProps) {
+export default function BuySell({ symbol, price, book, feeBps }: BuySellProps) {
   const [side, setSide] = useState<'buy' | 'sell'>('buy')
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [amountStr, setAmountStr] = useState('')
@@ -161,7 +164,12 @@ export default function BuySell({ symbol, price, book }: BuySellProps) {
   const theme = isBuy
     ? { bg: 'bg-yes', text: 'text-yes' }
     : { bg: 'bg-no', text: 'text-no' }
-  const tradable = info?.account?.usdcUi ?? 0
+  // 1x venue: a buy locks full notional + the market's taker fee, so the real
+  // max spend is equity ÷ (1 + fee). Floored to cents so the display can never
+  // exceed what the chain will accept.
+  const feeFrac = (feeBps ?? 100) / 10_000
+  const tradable = Math.floor(((info?.account?.usdcUi ?? 0) / (1 + feeFrac)) * 100) / 100
+  const overMax = isBuy && tradable > 0 && amountNum > tradable
   const position = info?.account?.positions.find((p) => p.symbol === symbol)
   const positionSize = position ? Math.abs(position.baseUi) : 0
   const needsFunding = connected && (!info?.account || (tradable === 0 && !position))
@@ -217,7 +225,7 @@ export default function BuySell({ symbol, price, book }: BuySellProps) {
       <div className="flex justify-between text-[11px] text-muted">
         <span>{orderType === 'market' ? 'est. entry' : 'mark'} <span className="text-text">${fmtPrice(price)}</span></span>
         {connected && (
-          <span>tradable <span className="text-text">${tradable.toFixed(2)}</span></span>
+          <span title={`max buy after the ${(feeFrac * 100).toFixed(2)}% taker fee`}>tradable <span className="text-text">${tradable.toFixed(2)}</span></span>
         )}
       </div>
 
@@ -293,7 +301,10 @@ export default function BuySell({ symbol, price, book }: BuySellProps) {
           QUICK.map((v) => (
             <button
               key={v}
-              onClick={() => setAmountStr(Math.max(0.01, (parseFloat(amountStr) || 0) + v).toFixed(2))}
+              onClick={() => {
+                const next = Math.max(0.01, (parseFloat(amountStr) || 0) + v)
+                setAmountStr((tradable > 0 ? Math.min(next, tradable) : next).toFixed(2))
+              }}
               className="text-[11px] px-2 py-1 rounded-md border border-border text-muted hover:text-text hover:border-muted transition"
             >
               +${v}
@@ -389,13 +400,16 @@ export default function BuySell({ symbol, price, book }: BuySellProps) {
       ) : (
         <button
           onClick={onTrade}
-          disabled={busy !== null || contracts <= 0 || (orderType === 'limit' && limitPrice <= 0)}
+          disabled={busy !== null || contracts <= 0 || overMax || (orderType === 'limit' && limitPrice <= 0)}
           className={`w-full rounded-xl ${theme.bg} px-3 py-3 text-sm font-bold text-black shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-all active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed`}
         >
           {busy ?? (isBuy ? `LONG ${symbol}` : `SHORT ${symbol}`)}
         </button>
       )}
 
+      {overMax && (
+        <div className="text-[11px] text-no">✗ max ${tradable.toFixed(2)} — covers the {(feeFrac * 100).toFixed(2)}% taker fee</div>
+      )}
       {error && <div className="text-[11px] text-no">✗ {error}</div>}
       {isDemo && connected && (
         <div className="text-[10px] text-muted">

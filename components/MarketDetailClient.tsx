@@ -89,6 +89,8 @@ export default function MarketDetailClient({ id }: { id: string }) {
   // print. Between prints the book keeps trading (book-led, still live) — we show
   // a live countdown to the next session instead of "market closed".
   const [nextOracleAt, setNextOracleAt] = useState<number | null>(null)
+  // per-market taker fee — the ticket quotes "tradable" net of it
+  const [liveFeeBps, setLiveFeeBps] = useState<number | null>(null)
   // ticking clock so the "next oracle (in …)" countdown re-renders as it runs down
   const [nowTick, setNowTick] = useState<number>(() => Date.now())
   useEffect(() => {
@@ -149,6 +151,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
           if (found && typeof found.volume24hUsd === 'number') setLiveVol(found.volume24hUsd)
           if (found && typeof found.openInterestUsd === 'number') setLiveOI(found.openInterestUsd)
           if (found && typeof found.oracleLive === 'boolean') setFeedLive(found.oracleLive)
+          if (found && typeof found.feeBps === 'number') setLiveFeeBps(found.feeBps)
           setNextOracleAt(found && typeof found.nextOracleAt === 'number' ? found.nextOracleAt : null)
         })
         .catch(e => {
@@ -330,7 +333,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
             )}
 
             <div className="relative">
-              {chartData && <Sparkline data={chartData} isPositive={up} oracleSeries={oracleSeries} />}
+              {chartData && <Sparkline data={chartData} isPositive={up} oracleSeries={oracleSeries} showModes />}
               {isYf ? (
                 <div className="absolute top-1.5 left-1.5 text-[10px] bg-bg/85 border border-[#ff9f43]/40 rounded-md px-1.5 py-0.5 pointer-events-none">
                   <span className="text-[#ff9f43]">— oracle ${fmtPricePrecise(oraclePrice)}</span>
@@ -398,7 +401,7 @@ export default function MarketDetailClient({ id }: { id: string }) {
 
         <div className="md:col-span-1 flex flex-col gap-6">
           <div className="border border-border rounded-xl bg-panel p-4">
-            <BuySell symbol={market.symbol} price={markPrice} book={book} />
+            <BuySell symbol={market.symbol} price={markPrice} book={book} feeBps={liveFeeBps} />
           </div>
           {chainSymbol && <MarketMeta chainSymbol={chainSymbol} />}
           {chainSymbol && <CreatorFees chainSymbol={chainSymbol} />}
