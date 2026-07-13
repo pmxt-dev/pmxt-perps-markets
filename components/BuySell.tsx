@@ -353,17 +353,19 @@ export default function BuySell({ symbol, price, book, feeBps }: BuySellProps) {
       </div>
 
       {contracts > 0 && (
-        {overMax && (
-          <div className="text-[11px] text-no">
-            exceeds your margin — max new exposure ≈ ${tradable.toFixed(2)}
-            {!isBuy && effPrice > 0 ? ` (${(tradable / effPrice).toFixed(4)} sh${reducible > 0 ? ` + ${reducible.toFixed(4)} sh closing` : ''})` : ''}
+        <>
+          {overMax && (
+            <div className="text-[11px] text-no">
+              exceeds your margin — max new exposure ≈ ${tradable.toFixed(2)}
+              {!isBuy && effPrice > 0 ? ` (${(tradable / effPrice).toFixed(4)} sh${reducible > 0 ? ` + ${reducible.toFixed(4)} sh closing` : ''})` : ''}
+            </div>
+          )}
+          <div className={`text-[11px] ${isBuy ? 'text-yes' : 'text-no'}`}>
+            {orderType === 'market'
+              ? `→ ${isBuy ? 'long' : 'short'} ${contracts.toFixed(2)} ${symbol}`
+              : `→ rest ${contracts.toFixed(2)} ${symbol} @ $${fmtPrice(effPrice)} · maker`}
           </div>
-        )}
-        <div className={`text-[11px] ${isBuy ? 'text-yes' : 'text-no'}`}>
-          {orderType === 'market'
-            ? `→ ${isBuy ? 'long' : 'short'} ${contracts.toFixed(2)} ${symbol}`
-            : `→ rest ${contracts.toFixed(2)} ${symbol} @ $${fmtPrice(effPrice)} · maker`}
-        </div>
+        </>
       )}
 
       {!connected ? (
